@@ -1,0 +1,16 @@
+{
+  "headline": "首輪名單確定，還沒有檢索品質的結果",
+  "summary": "5.1.2 已在 Nano 上載入 5 個候選和 1 個對照組，並量測載入時間、記憶體與單句延遲，全部在門檻內。Recall、MRR、nDCG 等檢索指標要等 5.1.3–5.1.8 建好資料後才有。",
+  "conclusion": "尚未選型。首輪候選為 ruri-v3-30m、ruri-v3-130m、ruri-v3-310m、Qwen3-Embedding-0.6B、multilingual-e5-small，產品現用的 bge-base-zh-v1.5 當對照組；GLuCoSE 因 transformers 5 不相容而移出。",
+  "tasks": [
+    { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成；列出調查表的 CLI 尚未做" },
+    { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：環境、registry、CLI、載入量測、首輪名單" },
+    { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "尚未開始" },
+    { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "尚未開始，只有 prompt 草稿" },
+    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始；ChromaDB 已通過讀寫檢查" },
+    { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
+    { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
+    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "尚未開始" },
+    { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "尚未開始" }
+  ]
+}

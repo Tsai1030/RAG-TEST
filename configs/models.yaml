@@ -1,0 +1,103 @@
+# 模型 registry：所有模型資訊都放這裡，程式不寫死（見計畫書 5.1.2）
+# - revision 固定為 commit hash（查詢日 2026-11-07）
+# - prefix 依各模型的 model card；由程式統一加在原文前面，業務程式不手動拼接
+# - max_seq_length 統一 512：記憶不超過 200 字，原生上限更長的模型也截在 512
+# - dtype 是 CUDA 載入時的精度，取權重的原生精度；CPU 一律用 float32
+#   （Cortex-A78AE 沒有 bf16 硬體指令）
+
+settings:
+  hf_home: .hf_cache          # 相對於專案根目錄；不使用共用的 ~/.cache/huggingface
+  download_ignore:            # 不下載 ONNX、OpenVINO 與評測結果檔
+    - "onnx/*"
+    - "openvino/*"
+    - "results/*"
+    - "results-len512/*"
+    - ".eval_results/*"
+    - "*.onnx"
+
+models:
+  ruri-v3-30m:
+    hf_id: cl-nagoya/ruri-v3-30m
+    revision: 24899e5de370b56d179604a007c0d727bf144504
+    role: candidate
+    dim: 256
+    max_seq_length: 512
+    query_prefix: "検索クエリ: "
+    document_prefix: "検索文書: "
+    dtype: float32
+    trust_remote_code: false
+    license: Apache-2.0
+    commercial_ok: true
+
+  ruri-v3-130m:
+    hf_id: cl-nagoya/ruri-v3-130m
+    revision: e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6
+    role: candidate
+    dim: 512
+    max_seq_length: 512
+    query_prefix: "検索クエリ: "
+    document_prefix: "検索文書: "
+    dtype: float32
+    trust_remote_code: false
+    license: Apache-2.0
+    commercial_ok: true
+
+  ruri-v3-310m:
+    hf_id: cl-nagoya/ruri-v3-310m
+    revision: 18b60fb8c2b9df296fb4212bb7d23ef94e579cd3
+    role: candidate
+    dim: 768
+    max_seq_length: 512
+    query_prefix: "検索クエリ: "
+    document_prefix: "検索文書: "
+    dtype: float32
+    trust_remote_code: false
+    license: Apache-2.0
+    commercial_ok: true
+
+  # pkshatech/GLuCoSE-base-ja-v2（a6cbdf4d）首輪移出（2026-11-07）：
+  # transformers 5.x 的 MLukeTokenizer 無法正確載入（5.22 報錯、5.0 的 Token ID 全錯），
+  # sentence-transformers 6.2 又要求 transformers 5.x，無法與其他模型共用環境。
+
+  qwen3-emb-0.6b:
+    hf_id: Qwen/Qwen3-Embedding-0.6B
+    revision: 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+    role: candidate
+    dim: 1024
+    max_seq_length: 512
+    # 與模型內建的 query prompt 完全相同（Query: 後面沒有空格）
+    query_prefix: "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
+    document_prefix: ""
+    dtype: bfloat16
+    trust_remote_code: false
+    license: Apache-2.0
+    commercial_ok: true
+
+  e5-small:
+    hf_id: intfloat/multilingual-e5-small
+    revision: 614241f622f53c4eeff9890bdc4f31cfecc418b3
+    role: candidate
+    dim: 384
+    max_seq_length: 512
+    query_prefix: "query: "
+    document_prefix: "passage: "
+    dtype: float32
+    trust_remote_code: false
+    license: MIT
+    commercial_ok: true
+    download_ignore: ["pytorch_model.bin"]   # 已有 model.safetensors
+
+  # 產品現用模型，當對照組，不參與選型
+  bge-base-zh-v1.5:
+    hf_id: BAAI/bge-base-zh-v1.5
+    revision: f03589ceff5aac7111bd60cfc7d497ca17ecac65
+    role: baseline
+    dim: 768
+    max_seq_length: 512
+    # model card 建議檢索時在 query 加這段指令；產品實際用法待確認
+    query_prefix: "为这个句子生成表示以用于检索相关文章："
+    document_prefix: ""
+    dtype: float32
+    trust_remote_code: false
+    license: MIT
+    commercial_ok: true

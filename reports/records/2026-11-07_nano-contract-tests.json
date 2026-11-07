@@ -1,0 +1,33 @@
+{
+  "title": "Nano 完整測試（含真實模型）",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "自動測試",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "修正 Qwen3 正規化並移出 GLuCoSE 後，包含真實模型的全部測試能不能通過？",
+  "environment": [
+    "robo@172.28.0.147，6 個模型已下載",
+    "常駐服務已停止（與載入量測同一個工作階段）"
+  ],
+  "method": ["uv run pytest -q -rs"],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "結果"],
+      "rows": [
+        ["總計", "111 通過、0 失敗、0 略過，耗時 4 分 12 秒"],
+        ["Prefix 契約", "6 個模型的 prefix 都與 model card 相同；Qwen3 與內建 prompt 相同；實際送進模型的文字確實加上 prefix"],
+        ["EmbeddingProvider 契約", "Fake 與 6 個真實模型都通過：維度、單位長度、可重現、批次與單筆一致、query 與 document 的 prefix 確實生效"],
+        ["架構與其他", "分層規則、README 覆蓋、registry 驗證、ChromaDB 讀寫、CLI 全部通過"]
+      ]
+    }
+  ],
+  "conclusion": ["5.1.2 驗收要求的 Prefix 契約測試通過。"],
+  "next": [],
+  "sources": [{ "text": "tests/" }],
+  "related": [
+    { "id": "2026-11-07_nano-contract-tests-run1", "relation": "第 1 次的失敗與修正" },
+    { "id": "2026-11-07_skeleton-dev-tests", "relation": "Windows 上的開發測試" }
+  ]
+}

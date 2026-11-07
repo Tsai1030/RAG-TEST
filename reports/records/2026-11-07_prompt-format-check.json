@@ -1,0 +1,31 @@
+{
+  "title": "Prompt 格式與變數檢查",
+  "date": "2026-11-07",
+  "task": "5.1.4",
+  "type": "自動測試",
+  "status": "通過",
+  "backfilled": true,
+  "purpose": "四份 prompt 的格式是否正確？宣告的變數和內文是否一致？",
+  "environment": ["robo@172.28.0.147，uv + PyYAML", "暫時性檢查腳本，正式測試尚未建立"],
+  "method": ["解析 prompts/*.yaml，檢查必要欄位、檔名與內容一致、變數宣告與內文相符；最後一次另外檢查 user 訊息含假名"],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "結果"],
+      "rows": [
+        ["執行次數", "3 次（建立時、改成只做日文後、指令改成日文後）"],
+        ["最後結果", "4 份全部通過"],
+        ["曾出現的失敗", "無"]
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "只驗格式",
+      "text": "沒有呼叫 LLM，不代表 prompt 的效果好。品質要到 5.1.4 才會測。"
+    }
+  ],
+  "conclusion": ["格式正確，內容仍是草稿。"],
+  "next": ["5.1.4 用真實 LLM 測試第一次通過率與 Gold Fact 覆蓋率。"],
+  "sources": [{ "text": "prompts/" }],
+  "related": []
+}

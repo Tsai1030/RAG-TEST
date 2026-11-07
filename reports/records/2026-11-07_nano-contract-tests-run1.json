@@ -1,0 +1,38 @@
+{
+  "title": "Nano 完整測試（第 1 次）",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "自動測試",
+  "status": "失敗",
+  "backfilled": false,
+  "purpose": "包含真實模型的契約測試與 Prefix 契約，在 Nano 上能不能全部通過？",
+  "environment": [
+    "robo@172.28.0.147，7 個模型已下載",
+    "常駐服務已停止（與載入量測第 1 次同一個工作階段）"
+  ],
+  "method": ["uv run pytest -q -rs"],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "結果"],
+      "rows": [
+        ["總計", "117 通過、2 失敗、6 錯誤、0 略過，耗時 5 分 24 秒"],
+        ["GLuCoSE-base-ja-v2", "7 項失敗或錯誤：tokenizer 無法載入（Unrecognized processing class）"],
+        ["Qwen3-Embedding-0.6B", "1 項失敗：向量長度 1.0013，超過容許誤差 0.001"],
+        ["其他 5 個模型", "全部通過"]
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "Qwen3 的原因",
+      "text": "Qwen3 用 bfloat16 載入，正規化在低精度下進行，長度誤差約 0.1%，會讓 cosine 分數略微偏高。已改成轉為 float32 後再正規化，所有模型適用。"
+    }
+  ],
+  "conclusion": ["Qwen3 是本專案程式的問題，已修正；GLuCoSE 是套件相容性問題，另見相容性檢查紀錄。"],
+  "next": ["修正後在 Nano 重跑。"],
+  "sources": [{ "text": "tests/contract/test_embedding_provider.py" }],
+  "related": [
+    { "id": "2026-11-07_glucose-transformers-compat", "relation": "GLuCoSE 失敗原因" },
+    { "id": "2026-11-07_nano-contract-tests", "relation": "修正後重跑" }
+  ]
+}

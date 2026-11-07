@@ -1,0 +1,20 @@
+name: summarize_retry
+version: v1
+status: draft
+purpose: 摘要輸出驗證失敗時，接在原本的 summarize 訊息後面要求修正
+used_by: src/memrag/application/summarize.py
+task: "5.1.4"
+variables:
+  - previous_output
+  - validation_errors
+system: null
+user: |
+  前回の出力は検証に通りませんでした。
+
+  前回の出力：
+  {{previous_output}}
+
+  検証エラー：
+  {{validation_errors}}
+
+  上記のエラーだけを修正し、他の内容は変更しないでください。完全な JSON を出力し直し、それ以外の文字は出力しないでください。

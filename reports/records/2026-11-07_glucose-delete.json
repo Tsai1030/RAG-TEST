@@ -1,0 +1,32 @@
+{
+  "title": "GLuCoSE 模型檔刪除",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "環境檢查",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "依使用者指示刪除已移出名單的 GLuCoSE 模型檔，且不影響其他模型。",
+  "environment": ["robo@172.28.0.147，~/50019/rag_test/.hf_cache（本專案自己的快取）"],
+  "method": [
+    "找出 GLuCoSE 快照指向的檔案，與其他 6 個模型指向的檔案比對",
+    "只刪除 GLuCoSE 獨有的檔案與它的模型資料夾",
+    "刪除後執行 memrag models list，並檢查有沒有失效的連結"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "結果"],
+      "rows": [
+        ["GLuCoSE 檔案", "13 個，都沒有和其他模型共用"],
+        ["釋放空間", "508 MiB；磁碟剩餘從 9.2 GB 增加到 9.7 GB"],
+        ["其他模型", "6 個都仍顯示已下載，沒有失效的連結"]
+      ]
+    }
+  ],
+  "conclusion": ["GLuCoSE 已從 Nano 移除；之後要用的話需重新下載並另建 transformers 4.x 環境。"],
+  "next": [],
+  "sources": [{ "text": "configs/models.yaml 的移出註記" }],
+  "related": [
+    { "id": "2026-11-07_glucose-transformers-compat", "relation": "移出原因；該紀錄寫的「暫時保留」已由本紀錄更新" }
+  ]
+}

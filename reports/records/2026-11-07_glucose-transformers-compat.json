@@ -1,0 +1,44 @@
+{
+  "title": "GLuCoSE 與 transformers 5 相容性檢查",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "環境檢查",
+  "status": "失敗",
+  "backfilled": false,
+  "purpose": "GLuCoSE-base-ja-v2 能不能和其他模型共用同一個 transformers 版本？",
+  "environment": [
+    "robo@172.28.0.147，CPU 執行",
+    "其他版本用 uv 臨時環境測試，不改專案環境"
+  ],
+  "method": [
+    "用同一句 query: 日本で一番高い山は？ 比較各版本的 Token ID",
+    "以 transformers 4.57.6 的結果為準，比較 19 句的 Token ID 與向量"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["版本", "結果"],
+      "rows": [
+        ["transformers 4.57.6（tokenizers 0.22.2）", "正常，作為比較基準"],
+        ["transformers 5.22.2（專案環境）", "載入失敗：MLukeTokenizer 把字典傳給只接受序列的參數"],
+        ["transformers 5.4、5.14、5.21 各抽測一版", "同樣載入失敗"],
+        ["transformers 5.0.0", "能載入但結果錯誤：Token ID 全部差 1，且有字變成未知字"],
+        ["5.22.2 改用 XLM-R tokenizer 讀同一個 sentencepiece 檔", "Token ID 0/19 句相同，向量 cosine 最低 0.32，不能用"]
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "為什麼不能降版",
+      "text": "sentence-transformers 6.2.0 要求 transformers 5.x。只有另建 transformers 4.x 加 sentence-transformers 5.x 的獨立環境，才能使用 GLuCoSE。"
+    }
+  ],
+  "conclusion": [
+    "GLuCoSE 無法與其他模型共用環境，首輪移出名單。",
+    "不採用獨立環境：之後每次向量化都要跨環境呼叫，增加 5.1.5–5.1.8 的複雜度；這個模型也沒有可比較的公開分數。剩下 5 個候選仍符合 4–6 個的要求。"
+  ],
+  "next": ["使用者如果想保留 GLuCoSE，再建立獨立環境。下載的模型檔（509 MiB）暫時保留在 .hf_cache。"],
+  "sources": [{ "text": "configs/models.yaml 的移出註記" }],
+  "related": [
+    { "id": "2026-11-07_nano-contract-tests-run1", "relation": "發現問題的測試" }
+  ]
+}

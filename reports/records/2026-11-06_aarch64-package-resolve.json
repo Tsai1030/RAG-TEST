@@ -1,0 +1,25 @@
+{
+  "title": "aarch64 套件相容性解析",
+  "date": "2026-11-06",
+  "task": "5.1.2",
+  "type": "環境檢查",
+  "status": "資訊",
+  "backfilled": true,
+  "purpose": "主要套件有沒有 aarch64 版本可以安裝？",
+  "environment": ["robo@172.28.0.147，uv 0.12.19"],
+  "method": ["用 uv 解析相依套件，沒有實際安裝"],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["套件", "版本", "結果"],
+      "rows": [
+        ["chromadb", "1.5.9", "可解析到 aarch64 wheel"],
+        ["sentence-transformers", "6.2.0", "可解析到 aarch64 wheel"]
+      ]
+    }
+  ],
+  "conclusion": ["只確認可解析，不代表能正常執行。"],
+  "next": ["5.1.2 實際安裝並通過讀寫測試。"],
+  "sources": [{ "text": "計畫書第 2.1 節" }],
+  "related": []
+}

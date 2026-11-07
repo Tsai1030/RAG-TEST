@@ -1,0 +1,30 @@
+{
+  "title": "Nano 環境與 GPU 檢查",
+  "date": "2026-11-06",
+  "task": "5.1.2",
+  "type": "環境檢查",
+  "status": "資訊",
+  "backfilled": true,
+  "purpose": "Jetson Orin Nano 能不能用 GPU 跑 PyTorch？硬體資源有多少？",
+  "environment": ["robo@172.28.0.147", "使用其他專案現有環境的 torch 2.15.0+cu132，本專案環境尚未建立"],
+  "method": ["透過 SSH 查看硬體、系統、記憶體與磁碟", "在現有 PyTorch 環境實跑 512×512 矩陣乘法"],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "結果"],
+      "rows": [
+        ["機型", "Jetson Orin Nano Super，MAXN_SUPER"],
+        ["系統", "Ubuntu 24.04.5、L4T R39.2.1、aarch64"],
+        ["CPU", "6 核 Cortex-A78AE"],
+        ["記憶體", "7.3 GiB，CPU 與 GPU 共用，無 Swap"],
+        ["可用記憶體", "常駐服務執行時約 2.7 GiB"],
+        ["GPU", "CUDA 13.2；nvidia-smi 讀不到記憶體"],
+        ["PyTorch", "CUDA 可用，矩陣乘法成功"]
+      ]
+    }
+  ],
+  "conclusion": ["GPU 可用。記憶體是主要限制，量測時要暫停常駐服務（D8）。"],
+  "next": ["5.1.2 在本專案建立獨立環境後重新驗證。"],
+  "sources": [{ "text": "計畫書第 2.1 節" }],
+  "related": []
+}

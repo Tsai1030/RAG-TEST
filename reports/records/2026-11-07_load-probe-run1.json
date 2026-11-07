@@ -1,0 +1,31 @@
+{
+  "title": "模型載入量測（第 1 次，程式錯誤）",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "Profiling",
+  "status": "失敗",
+  "backfilled": false,
+  "purpose": "7 個模型在 CUDA 與 CPU 上的載入時間、記憶體與延遲是多少？",
+  "environment": [
+    "robo@172.28.0.147，run_id 20261107-181738_load_probe",
+    "llama-server 與 pocket_tts_server 由 nano_measure.sh 停止（18:17–18:28，含之後的 pytest），結束後重啟並確認可連線"
+  ],
+  "method": ["uv run memrag models probe --devices cuda,cpu，每個模型與裝置各一個子行程"],
+  "results": [
+    {
+      "kind": "p",
+      "text": "14 組全部失敗，錯誤相同：TypeError: 'Event' object is not callable。"
+    },
+    {
+      "kind": "note",
+      "title": "原因",
+      "text": "記憶體取樣執行緒把停止旗標命名為 _stop，蓋掉了 Python Thread 內建的同名方法，所以結束取樣時當掉。從耗時看，模型載入和延遲量測都已跑完，是收尾時才失敗。"
+    }
+  ],
+  "conclusion": ["量測程式的錯誤，與模型無關，沒有可用數據。"],
+  "next": ["改名為 _done，補單元測試後重跑。"],
+  "sources": [{ "text": "results/runs/20261107-181738_load_probe/" }],
+  "related": [
+    { "id": "2026-11-07_load-probe", "relation": "修正後重跑" }
+  ]
+}

@@ -1,0 +1,87 @@
+# Python 3.11：Nano 的 uv 快取已有 cp311 的 torch 2.15.0+cu132，可直接重用，不另佔磁碟
+# PyTorch 來源：Jetson（Linux aarch64）用官方 cu132 版，其他平台用 CPU 版
+[project]
+name = "memrag"
+version = "0.1.0"
+description = "日文對話記憶 RAG 的 Embedding 模型評估與選型"
+requires-python = "==3.11.*"
+dependencies = [
+  "torch==2.15.0",
+  "sentence-transformers==6.2.0",
+  "chromadb==1.5.9",
+  "huggingface-hub",
+  "sentencepiece",
+  "psutil",
+  "pyyaml",
+  "numpy",
+]
+
+[project.scripts]
+memrag = "memrag.interfaces.cli.main:main"
+
+[dependency-groups]
+dev = ["pytest", "import-linter"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/memrag"]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu132", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+  { index = "pytorch-cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+markers = [
+  "models: 需要已下載的模型，沒有下載時自動略過",
+  "gpu: 需要 CUDA，沒有 GPU 時自動略過",
+]
+
+# 分層規則，見計畫書第 4 節
+[tool.importlinter]
+root_package = "memrag"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "domain 不依賴外部框架與其他層"
+type = "forbidden"
+source_modules = ["memrag.domain"]
+forbidden_modules = [
+  "memrag.application", "memrag.infrastructure", "memrag.interfaces", "memrag.api", "memrag.bootstrap",
+  "torch", "transformers", "sentence_transformers", "chromadb", "huggingface_hub", "yaml", "psutil",
+]
+
+[[tool.importlinter.contracts]]
+name = "application 只依賴 domain"
+type = "forbidden"
+source_modules = ["memrag.application"]
+forbidden_modules = ["memrag.infrastructure", "memrag.interfaces", "memrag.api", "memrag.bootstrap"]
+
+[[tool.importlinter.contracts]]
+name = "infrastructure 不依賴上層"
+type = "forbidden"
+source_modules = ["memrag.infrastructure"]
+forbidden_modules = ["memrag.application", "memrag.interfaces", "memrag.api", "memrag.bootstrap"]
+
+[[tool.importlinter.contracts]]
+name = "interfaces 只呼叫 Facade"
+type = "forbidden"
+source_modules = ["memrag.interfaces"]
+forbidden_modules = ["memrag.application", "memrag.infrastructure", "memrag.bootstrap"]
+allow_indirect_imports = true

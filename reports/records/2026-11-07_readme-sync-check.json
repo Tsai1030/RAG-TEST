@@ -1,0 +1,29 @@
+{
+  "title": "README 覆蓋檢查與 Nano 同步驗證",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "環境檢查",
+  "status": "通過",
+  "backfilled": true,
+  "purpose": "每個資料夾都有 README 嗎？Windows 的檔案有完整同步到 Nano 嗎？",
+  "environment": ["Windows D:\\RAG TEST → robo@172.28.0.147:~/50019/rag_test"],
+  "method": [
+    "用 scripts/nano_sync.ps1 同步，比對兩邊每個檔案的 SHA-256",
+    "暫時性腳本檢查每個資料夾都有 README，且列出所有檔案；正式測試 test_readme_coverage.py 尚未建立"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "結果"],
+      "rows": [
+        ["執行次數", "每次改動後都重跑，早期次數沒有逐一記錄"],
+        ["最後結果", "檔案數相同，hash 全部一致；每個資料夾的 README 都列出所有檔案"],
+        ["曾出現的失敗", "無"]
+      ]
+    }
+  ],
+  "conclusion": ["同步與 README 目前都正確。"],
+  "next": ["5.1.2 改成正式的自動測試。"],
+  "sources": [{ "text": "scripts/nano_sync.ps1" }],
+  "related": []
+}

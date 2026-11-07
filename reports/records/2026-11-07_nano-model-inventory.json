@@ -1,0 +1,28 @@
+{
+  "title": "Nano 模型盤點與 Gemma 刪除",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "環境檢查",
+  "status": "通過",
+  "backfilled": true,
+  "purpose": "磁碟只剩 8.7 GB，哪些模型可以刪除？",
+  "environment": ["robo@172.28.0.147"],
+  "method": ["盤點 Nano 上的模型，確認是否有程式或其他專案引用", "經使用者確認後，刪除明確無人使用的模型"],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["模型", "處理", "原因"],
+      "rows": [
+        ["LM Studio Gemma 4 E4B GGUF（約 5.9 GiB）", "已刪除", "沒有程式引用"],
+        ["~/gemma4_litert", "保留", "產品 LLM，50023 有符號連結"],
+        ["Hugging Face 快取（約 8 GB）", "保留", "st3、stt-test 使用"],
+        ["50018 的 ASR 模型（約 15 GB）", "保留", "屬於其他專案，要先問過負責人"]
+      ]
+    },
+    { "kind": "p", "text": "磁碟剩餘空間從 8.7 GB 增加到 15 GB。" }
+  ],
+  "conclusion": ["候選模型總大小維持約 4 GB 的預算。"],
+  "next": ["下載模型與建環境前都要再檢查剩餘空間。"],
+  "sources": [{ "text": "計畫書 D9" }],
+  "related": []
+}

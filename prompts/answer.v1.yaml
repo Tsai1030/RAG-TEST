@@ -1,0 +1,30 @@
+name: answer
+version: v1
+status: draft
+purpose: 依檢索到的記憶回答問題，並附上引用的 memory_id
+used_by: src/memrag/application/answer.py
+task: "5.1.6"
+variables:
+  - question
+  - memories
+  - refusal_text
+  - output_schema
+system: |
+  あなたは提供された記憶に基づいて質問に答えます。
+
+  ルール：
+  1. 提供された記憶だけを使い、他の知識や推測を使わないでください。
+  2. 記憶の内容が似ていても質問に答えていない場合は、答えなしとして扱ってください。
+  3. 答えがない場合、answer は「{{refusal_text}}」と完全に一致させ、cited_memory_ids は空のリストにしてください。
+  4. 答えがある場合は日本語で答え、実際に使った記憶を cited_memory_ids に列挙してください。
+  5. 各記憶の先頭の角括弧内の文字列が memory_id です。一覧にある ID だけを引用してください。
+  6. スキーマに沿った JSON のみを出力し、それ以外の文字は出力しないでください。
+user: |
+  質問：
+  {{question}}
+
+  記憶：
+  {{memories}}
+
+  出力スキーマ：
+  {{output_schema}}

@@ -1,0 +1,30 @@
+{
+  "title": "初步候選模型卡查閱",
+  "date": "2026-11-06",
+  "task": "5.1.1",
+  "type": "模型調查",
+  "status": "資訊",
+  "backfilled": true,
+  "purpose": "寫計畫書時，先列出可能的日文 Embedding 候選。",
+  "environment": ["Windows 開發機查閱公開模型卡", "run_id、資料 hash：N/A"],
+  "method": ["查閱 8 個模型家族的模型卡，整理大小、維度、授權與 prefix 規則"],
+  "results": [
+    {
+      "kind": "list",
+      "items": [
+        "列出 ruri-v3、GLuCoSE v2、RoSEtta、PLaMo、Sarashina v1、e5-small、BGE-M3、EmbeddingGemma，共 10 個模型",
+        "部分欄位當時未確認，在計畫書標為待確認",
+        "PLaMo 和 Sarashina 的權重當時估計各約 4 GB，首輪排除"
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "已修正",
+      "text": "PLaMo 的權重實際約 2.0 GiB，估計有誤。Sarashina 實際約 4.6 GiB。正確資料見 2026-11-07 的候選模型調查。"
+    }
+  ],
+  "conclusion": ["只是初步清單，不能當作選型依據。"],
+  "next": ["由 5.1.1 正式調查複核。"],
+  "sources": [{ "text": "計畫書 v0.1–v0.9 的 5.1.1 初步候選表" }],
+  "related": [{ "id": "2026-11-07_model-survey", "relation": "這筆紀錄的修正" }]
+}

@@ -1,0 +1,32 @@
+name: dialogue_generate
+version: v1
+status: draft
+purpose: 依人物設定和 Gold Facts 生成假對話，作為摘要流程的輸入
+used_by: src/memrag/application/generate_dialogues.py
+task: "5.1.4"
+variables:
+  - persona
+  - gold_facts
+  - turn_count
+  - output_schema
+system: |
+  あなたは検索評価用の架空の会話ログを作成します。登場人物と出来事はすべて架空です。
+
+  ルール：
+  1. Gold Facts の各項目を会話の中に自然に登場させてください。省略や内容の変更はしないでください。
+  2. 人物設定や Gold Facts と矛盾する個人情報を追加しないでください。
+  3. Gold Facts をそのまま書き写さず、人物の話し方に合わせた表現にしてください。
+  4. 雑談を少し混ぜてください。ただし、雑談には日付、好み、予定など記憶の対象になる個人情報を含めないでください。
+  5. 会話は最初から最後まで自然な日本語で書き、中国語や英語の文を混ぜないでください。
+  6. スキーマに沿った JSON のみを出力し、それ以外の文字は出力しないでください。
+user: |
+  会話のターン数：{{turn_count}}
+
+  人物設定：
+  {{persona}}
+
+  Gold Facts：
+  {{gold_facts}}
+
+  出力スキーマ：
+  {{output_schema}}

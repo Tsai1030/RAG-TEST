@@ -1,0 +1,867 @@
+{
+    "source":  "https://github.com/embeddings-benchmark/results",
+    "source_commit":  "922b3df446f88756d954e4099b7211bcafaf99c9",
+    "fetched":  "2026-11-07",
+    "metric":  "main_score (nDCG@10), Japanese subset",
+    "note":  "Means here are simple averages computed for this survey, not official leaderboard values.",
+    "jmteb_retrieval_datasets":  {
+                                     "cl-nagoya/ruri-v3-30m":  {
+                                                                   "JaqketRetrieval":  {
+                                                                                           "score":  0.65303,
+                                                                                           "subset":  "default",
+                                                                                           "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                           "recall_at_5":  0.75025,
+                                                                                           "mrr_at_10":  0.601255
+                                                                                       },
+                                                                   "MrTidyRetrieval":  {
+                                                                                           "score":  0.54809,
+                                                                                           "subset":  "japanese",
+                                                                                           "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                           "recall_at_5":  0.63056,
+                                                                                           "mrr_at_10":  0.513204
+                                                                                       },
+                                                                   "JaGovFaqsRetrieval":  {
+                                                                                              "score":  0.7236,
+                                                                                              "subset":  "default",
+                                                                                              "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                              "recall_at_5":  0.81348,
+                                                                                              "mrr_at_10":  0.676988
+                                                                                          },
+                                                                   "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                          "score":  0.97483,
+                                                                                                          "subset":  "default",
+                                                                                                          "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                                          "recall_at_5":  0.9902,
+                                                                                                          "mrr_at_10":  0.967802
+                                                                                                      },
+                                                                   "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                            "score":  0.95405,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                                            "recall_at_5":  0.98627,
+                                                                                                            "mrr_at_10":  0.941732
+                                                                                                        },
+                                                                   "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                          "score":  0.99101,
+                                                                                                          "subset":  "default",
+                                                                                                          "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                                          "recall_at_5":  0.99608,
+                                                                                                          "mrr_at_10":  0.989216
+                                                                                                      },
+                                                                   "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                            "score":  0.98931,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                                            "recall_at_5":  0.99804,
+                                                                                                            "mrr_at_10":  0.986275
+                                                                                                        },
+                                                                   "JaCWIRRetrieval":  {
+                                                                                           "score":  0.81927,
+                                                                                           "subset":  "default",
+                                                                                           "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                           "recall_at_5":  0.87375,
+                                                                                           "mrr_at_10":  0.793352
+                                                                                       },
+                                                                   "MIRACLRetrieval":  {
+                                                                                           "score":  0.66355,
+                                                                                           "subset":  "ja",
+                                                                                           "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                           "recall_at_5":  0.69281,
+                                                                                           "mrr_at_10":  0.6859
+                                                                                       },
+                                                                   "MintakaRetrieval":  {
+                                                                                            "score":  0.28355,
+                                                                                            "subset":  "ja",
+                                                                                            "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                            "recall_at_5":  0.35035,
+                                                                                            "mrr_at_10":  0.236136
+                                                                                        },
+                                                                   "MultiLongDocRetrieval":  {
+                                                                                                 "score":  0.46526,
+                                                                                                 "subset":  "ja",
+                                                                                                 "revision":  "24899e5de370b56d179604a007c0d727bf144504",
+                                                                                                 "recall_at_5":  0.51,
+                                                                                                 "mrr_at_10":  0.443006
+                                                                                             }
+                                                               },
+                                     "cl-nagoya/ruri-v3-70m":  {
+                                                                   "JaqketRetrieval":  {
+                                                                                           "score":  0.70925,
+                                                                                           "subset":  "default",
+                                                                                           "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                           "recall_at_5":  0.8004,
+                                                                                           "mrr_at_10":  0.664184
+                                                                                       },
+                                                                   "MrTidyRetrieval":  {
+                                                                                           "score":  0.59472,
+                                                                                           "subset":  "japanese",
+                                                                                           "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                           "recall_at_5":  0.66806,
+                                                                                           "mrr_at_10":  0.561662
+                                                                                       },
+                                                                   "JaGovFaqsRetrieval":  {
+                                                                                              "score":  0.74609,
+                                                                                              "subset":  "default",
+                                                                                              "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                              "recall_at_5":  0.83203,
+                                                                                              "mrr_at_10":  0.702436
+                                                                                          },
+                                                                   "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                          "score":  0.97045,
+                                                                                                          "subset":  "default",
+                                                                                                          "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                                          "recall_at_5":  0.98627,
+                                                                                                          "mrr_at_10":  0.962488
+                                                                                                      },
+                                                                   "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                            "score":  0.96197,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                                            "recall_at_5":  0.9902,
+                                                                                                            "mrr_at_10":  0.950479
+                                                                                                        },
+                                                                   "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                          "score":  0.98621,
+                                                                                                          "subset":  "default",
+                                                                                                          "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                                          "recall_at_5":  0.99412,
+                                                                                                          "mrr_at_10":  0.982843
+                                                                                                      },
+                                                                   "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                            "score":  0.98957,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                                            "recall_at_5":  0.99804,
+                                                                                                            "mrr_at_10":  0.986601
+                                                                                                        },
+                                                                   "JaCWIRRetrieval":  {
+                                                                                           "score":  0.82012,
+                                                                                           "subset":  "default",
+                                                                                           "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                           "recall_at_5":  0.873,
+                                                                                           "mrr_at_10":  0.794278
+                                                                                       },
+                                                                   "MIRACLRetrieval":  {
+                                                                                           "score":  0.70497,
+                                                                                           "subset":  "ja",
+                                                                                           "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                           "recall_at_5":  0.73316,
+                                                                                           "mrr_at_10":  0.740692
+                                                                                       },
+                                                                   "MintakaRetrieval":  {
+                                                                                            "score":  0.29736,
+                                                                                            "subset":  "ja",
+                                                                                            "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                            "recall_at_5":  0.36505,
+                                                                                            "mrr_at_10":  0.252478
+                                                                                        },
+                                                                   "MultiLongDocRetrieval":  {
+                                                                                                 "score":  0.43923,
+                                                                                                 "subset":  "ja",
+                                                                                                 "revision":  "07a8b0aba47d29d2ca21f89b915c1efe2c23d1cc",
+                                                                                                 "recall_at_5":  0.485,
+                                                                                                 "mrr_at_10":  0.406054
+                                                                                             }
+                                                               },
+                                     "cl-nagoya/ruri-v3-130m":  {
+                                                                    "JaqketRetrieval":  {
+                                                                                            "score":  0.75137,
+                                                                                            "subset":  "default",
+                                                                                            "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                            "recall_at_5":  0.85356,
+                                                                                            "mrr_at_10":  0.708422
+                                                                                        },
+                                                                    "MrTidyRetrieval":  {
+                                                                                            "score":  0.61492,
+                                                                                            "subset":  "japanese",
+                                                                                            "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                            "recall_at_5":  0.69977,
+                                                                                            "mrr_at_10":  0.578037
+                                                                                        },
+                                                                    "JaGovFaqsRetrieval":  {
+                                                                                               "score":  0.77286,
+                                                                                               "subset":  "default",
+                                                                                               "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                               "recall_at_5":  0.85889,
+                                                                                               "mrr_at_10":  0.732241
+                                                                                           },
+                                                                    "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                           "score":  0.9807,
+                                                                                                           "subset":  "default",
+                                                                                                           "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                                           "recall_at_5":  0.99412,
+                                                                                                           "mrr_at_10":  0.975381
+                                                                                                       },
+                                                                    "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                             "score":  0.96432,
+                                                                                                             "subset":  "default",
+                                                                                                             "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                                             "recall_at_5":  0.98824,
+                                                                                                             "mrr_at_10":  0.954935
+                                                                                                         },
+                                                                    "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                           "score":  0.98938,
+                                                                                                           "subset":  "default",
+                                                                                                           "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                                           "recall_at_5":  0.99608,
+                                                                                                           "mrr_at_10":  0.987092
+                                                                                                       },
+                                                                    "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                             "score":  0.99587,
+                                                                                                             "subset":  "default",
+                                                                                                             "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                                             "recall_at_5":  0.99804,
+                                                                                                             "mrr_at_10":  0.995098
+                                                                                                         },
+                                                                    "JaCWIRRetrieval":  {
+                                                                                            "score":  0.83492,
+                                                                                            "subset":  "default",
+                                                                                            "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                            "recall_at_5":  0.88525,
+                                                                                            "mrr_at_10":  0.809655
+                                                                                        },
+                                                                    "MIRACLRetrieval":  {
+                                                                                            "score":  0.71574,
+                                                                                            "subset":  "ja",
+                                                                                            "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                            "recall_at_5":  0.73402,
+                                                                                            "mrr_at_10":  0.7459
+                                                                                        },
+                                                                    "MintakaRetrieval":  {
+                                                                                             "score":  0.32828,
+                                                                                             "subset":  "ja",
+                                                                                             "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                             "recall_at_5":  0.39533,
+                                                                                             "mrr_at_10":  0.280154
+                                                                                         },
+                                                                    "MultiLongDocRetrieval":  {
+                                                                                                  "score":  0.45663,
+                                                                                                  "subset":  "ja",
+                                                                                                  "revision":  "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+                                                                                                  "recall_at_5":  0.515,
+                                                                                                  "mrr_at_10":  0.423663
+                                                                                              }
+                                                                },
+                                     "cl-nagoya/ruri-v3-310m":  {
+                                                                    "JaqketRetrieval":  {
+                                                                                            "score":  0.73417,
+                                                                                            "subset":  "default",
+                                                                                            "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                            "recall_at_5":  0.82447,
+                                                                                            "mrr_at_10":  0.690207
+                                                                                        },
+                                                                    "MrTidyRetrieval":  {
+                                                                                            "score":  0.61684,
+                                                                                            "subset":  "japanese",
+                                                                                            "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                            "recall_at_5":  0.69352,
+                                                                                            "mrr_at_10":  0.580468
+                                                                                        },
+                                                                    "JaGovFaqsRetrieval":  {
+                                                                                               "score":  0.77257,
+                                                                                               "subset":  "default",
+                                                                                               "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                               "recall_at_5":  0.85449,
+                                                                                               "mrr_at_10":  0.733625
+                                                                                           },
+                                                                    "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                           "score":  0.97848,
+                                                                                                           "subset":  "default",
+                                                                                                           "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                                           "recall_at_5":  0.99216,
+                                                                                                           "mrr_at_10":  0.973693
+                                                                                                       },
+                                                                    "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                             "score":  0.96532,
+                                                                                                             "subset":  "default",
+                                                                                                             "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                                             "recall_at_5":  0.9902,
+                                                                                                             "mrr_at_10":  0.955563
+                                                                                                         },
+                                                                    "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                           "score":  0.99076,
+                                                                                                           "subset":  "default",
+                                                                                                           "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                                           "recall_at_5":  0.99608,
+                                                                                                           "mrr_at_10":  0.988889
+                                                                                                       },
+                                                                    "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                             "score":  0.99587,
+                                                                                                             "subset":  "default",
+                                                                                                             "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                                             "recall_at_5":  0.99804,
+                                                                                                             "mrr_at_10":  0.995098
+                                                                                                         },
+                                                                    "JaCWIRRetrieval":  {
+                                                                                            "score":  0.8405,
+                                                                                            "subset":  "default",
+                                                                                            "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                            "recall_at_5":  0.8915,
+                                                                                            "mrr_at_10":  0.816066
+                                                                                        },
+                                                                    "MIRACLRetrieval":  {
+                                                                                            "score":  0.72333,
+                                                                                            "subset":  "ja",
+                                                                                            "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                            "recall_at_5":  0.73631,
+                                                                                            "mrr_at_10":  0.759371
+                                                                                        },
+                                                                    "MintakaRetrieval":  {
+                                                                                             "score":  0.3353,
+                                                                                             "subset":  "ja",
+                                                                                             "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                             "recall_at_5":  0.39836,
+                                                                                             "mrr_at_10":  0.286006
+                                                                                         },
+                                                                    "MultiLongDocRetrieval":  {
+                                                                                                  "score":  0.43662,
+                                                                                                  "subset":  "ja",
+                                                                                                  "revision":  "18b60fb8c2b9df296fb4212bb7d23ef94e579cd3",
+                                                                                                  "recall_at_5":  0.505,
+                                                                                                  "mrr_at_10":  0.403603
+                                                                                              }
+                                                                },
+                                     "sbintuitions/sarashina-embedding-v1-1b":  {
+                                                                                    "JaqketRetrieval":  {
+                                                                                                            "score":  0.64122,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                            "recall_at_5":  0.75527,
+                                                                                                            "mrr_at_10":  0.584113
+                                                                                                        },
+                                                                                    "MrTidyRetrieval":  {
+                                                                                                            "score":  0.42188,
+                                                                                                            "subset":  "japanese",
+                                                                                                            "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                            "recall_at_5":  0.48218,
+                                                                                                            "mrr_at_10":  0.397105
+                                                                                                        },
+                                                                                    "JaGovFaqsRetrieval":  {
+                                                                                                               "score":  0.72234,
+                                                                                                               "subset":  "default",
+                                                                                                               "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                               "recall_at_5":  0.81494,
+                                                                                                               "mrr_at_10":  0.678264
+                                                                                                           },
+                                                                                    "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                                           "score":  0.96876,
+                                                                                                                           "subset":  "default",
+                                                                                                                           "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                                           "recall_at_5":  0.9902,
+                                                                                                                           "mrr_at_10":  0.960803
+                                                                                                                       },
+                                                                                    "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                                             "score":  0.96611,
+                                                                                                                             "subset":  "default",
+                                                                                                                             "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                                             "recall_at_5":  0.99216,
+                                                                                                                             "mrr_at_10":  0.955948
+                                                                                                                         },
+                                                                                    "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                                           "score":  0.9916,
+                                                                                                                           "subset":  "default",
+                                                                                                                           "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                                           "recall_at_5":  0.99608,
+                                                                                                                           "mrr_at_10":  0.989434
+                                                                                                                       },
+                                                                                    "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                                             "score":  0.99199,
+                                                                                                                             "subset":  "default",
+                                                                                                                             "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                                             "recall_at_5":  0.99804,
+                                                                                                                             "mrr_at_10":  0.989869
+                                                                                                                         },
+                                                                                    "JaCWIRRetrieval":  {
+                                                                                                            "score":  0.82538,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                            "recall_at_5":  0.88025,
+                                                                                                            "mrr_at_10":  0.797245
+                                                                                                        },
+                                                                                    "MIRACLRetrieval":  {
+                                                                                                            "score":  0.51242,
+                                                                                                            "subset":  "ja",
+                                                                                                            "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                            "recall_at_5":  0.53817,
+                                                                                                            "mrr_at_10":  0.555794
+                                                                                                        },
+                                                                                    "MintakaRetrieval":  {
+                                                                                                             "score":  0.40246,
+                                                                                                             "subset":  "ja",
+                                                                                                             "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                             "recall_at_5":  0.48097,
+                                                                                                             "mrr_at_10":  0.346248
+                                                                                                         },
+                                                                                    "MultiLongDocRetrieval":  {
+                                                                                                                  "score":  0.34669,
+                                                                                                                  "subset":  "ja",
+                                                                                                                  "revision":  "d060fcd8984075071e7fad81baff035cbb3b6c7e",
+                                                                                                                  "recall_at_5":  0.39,
+                                                                                                                  "mrr_at_10":  0.311407
+                                                                                                              }
+                                                                                },
+                                     "sbintuitions/sarashina-embedding-v2-1b":  {
+                                                                                    "JaqketRetrieval":  {
+                                                                                                            "score":  0.73713,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                            "recall_at_5":  0.83751,
+                                                                                                            "mrr_at_10":  0.692494
+                                                                                                        },
+                                                                                    "MrTidyRetrieval":  {
+                                                                                                            "score":  0.5916,
+                                                                                                            "subset":  "japanese",
+                                                                                                            "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                            "recall_at_5":  0.67639,
+                                                                                                            "mrr_at_10":  0.567126
+                                                                                                        },
+                                                                                    "JaGovFaqsRetrieval":  {
+                                                                                                               "score":  0.75606,
+                                                                                                               "subset":  "default",
+                                                                                                               "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                               "recall_at_5":  0.83643,
+                                                                                                               "mrr_at_10":  0.714064
+                                                                                                           },
+                                                                                    "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                                           "score":  0.98036,
+                                                                                                                           "subset":  "default",
+                                                                                                                           "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                                           "recall_at_5":  0.99216,
+                                                                                                                           "mrr_at_10":  0.975719
+                                                                                                                       },
+                                                                                    "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                                             "score":  0.97824,
+                                                                                                                             "subset":  "default",
+                                                                                                                             "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                                             "recall_at_5":  0.99216,
+                                                                                                                             "mrr_at_10":  0.972274
+                                                                                                                         },
+                                                                                    "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                                           "score":  0.99539,
+                                                                                                                           "subset":  "default",
+                                                                                                                           "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                                           "recall_at_5":  0.99804,
+                                                                                                                           "mrr_at_10":  0.99451
+                                                                                                                       },
+                                                                                    "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                                             "score":  0.98576,
+                                                                                                                             "subset":  "default",
+                                                                                                                             "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                                             "recall_at_5":  0.99412,
+                                                                                                                             "mrr_at_10":  0.981772
+                                                                                                                         },
+                                                                                    "JaCWIRRetrieval":  {
+                                                                                                            "score":  0.8552,
+                                                                                                            "subset":  "default",
+                                                                                                            "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                            "recall_at_5":  0.906,
+                                                                                                            "mrr_at_10":  0.830529
+                                                                                                        },
+                                                                                    "MIRACLRetrieval":  {
+                                                                                                            "score":  0.65521,
+                                                                                                            "subset":  "ja",
+                                                                                                            "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                            "recall_at_5":  0.68305,
+                                                                                                            "mrr_at_10":  0.690033
+                                                                                                        },
+                                                                                    "MintakaRetrieval":  {
+                                                                                                             "score":  0.43648,
+                                                                                                             "subset":  "ja",
+                                                                                                             "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                             "recall_at_5":  0.52509,
+                                                                                                             "mrr_at_10":  0.376768
+                                                                                                         },
+                                                                                    "MultiLongDocRetrieval":  {
+                                                                                                                  "score":  0.45781,
+                                                                                                                  "subset":  "ja",
+                                                                                                                  "revision":  "1f3408afaa7b617e3445d891310a9c26dd0c68a5",
+                                                                                                                  "recall_at_5":  0.515,
+                                                                                                                  "mrr_at_10":  0.426526
+                                                                                                              }
+                                                                                },
+                                     "intfloat/multilingual-e5-small":  {
+                                                                            "JaqketRetrieval":  {
+                                                                                                    "score":  0.50653,
+                                                                                                    "subset":  "default",
+                                                                                                    "revision":  "c007d7ef6fd86656326059b28395a7a03a7c5846",
+                                                                                                    "recall_at_5":  0.59779,
+                                                                                                    "mrr_at_10":  0.452163
+                                                                                                },
+                                                                            "MrTidyRetrieval":  null,
+                                                                            "JaGovFaqsRetrieval":  {
+                                                                                                       "score":  0.65561,
+                                                                                                       "subset":  "default",
+                                                                                                       "revision":  "e4ce9877abf3edfe10b0d82785e83bdcb973e22e",
+                                                                                                       "recall_at_5":  0.7373,
+                                                                                                       "mrr_at_10":  0.6114002046130951
+                                                                                                   },
+                                                                            "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                                   "score":  0.94403,
+                                                                                                                   "subset":  "default",
+                                                                                                                   "revision":  "c007d7ef6fd86656326059b28395a7a03a7c5846",
+                                                                                                                   "recall_at_5":  0.98039,
+                                                                                                                   "mrr_at_10":  0.928842
+                                                                                                               },
+                                                                            "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                                     "score":  0.74584,
+                                                                                                                     "subset":  "default",
+                                                                                                                     "revision":  "c007d7ef6fd86656326059b28395a7a03a7c5846",
+                                                                                                                     "recall_at_5":  0.82157,
+                                                                                                                     "mrr_at_10":  0.703859
+                                                                                                                 },
+                                                                            "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                                   "score":  0.84222,
+                                                                                                                   "subset":  "default",
+                                                                                                                   "revision":  "c007d7ef6fd86656326059b28395a7a03a7c5846",
+                                                                                                                   "recall_at_5":  0.89412,
+                                                                                                                   "mrr_at_10":  0.817747
+                                                                                                               },
+                                                                            "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                                     "score":  0.83998,
+                                                                                                                     "subset":  "default",
+                                                                                                                     "revision":  "c007d7ef6fd86656326059b28395a7a03a7c5846",
+                                                                                                                     "recall_at_5":  0.88824,
+                                                                                                                     "mrr_at_10":  0.814868
+                                                                                                                 },
+                                                                            "JaCWIRRetrieval":  {
+                                                                                                    "score":  0.85538,
+                                                                                                    "subset":  "default",
+                                                                                                    "revision":  "c007d7ef6fd86656326059b28395a7a03a7c5846",
+                                                                                                    "recall_at_5":  0.8975,
+                                                                                                    "mrr_at_10":  0.833068
+                                                                                                },
+                                                                            "MIRACLRetrieval":  null,
+                                                                            "MintakaRetrieval":  {
+                                                                                                     "score":  0.20695,
+                                                                                                     "subset":  "ja",
+                                                                                                     "revision":  "e4ce9877abf3edfe10b0d82785e83bdcb973e22e",
+                                                                                                     "recall_at_5":  0.2474,
+                                                                                                     "mrr_at_10":  0.17761008815290807
+                                                                                                 },
+                                                                            "MultiLongDocRetrieval":  null
+                                                                        },
+                                     "BAAI/bge-m3":  {
+                                                         "JaqketRetrieval":  {
+                                                                                 "score":  0.51219,
+                                                                                 "subset":  "default",
+                                                                                 "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                 "recall_at_5":  0.60682,
+                                                                                 "mrr_at_10":  0.454927
+                                                                             },
+                                                         "MrTidyRetrieval":  {
+                                                                                 "score":  0.65446,
+                                                                                 "subset":  "japanese",
+                                                                                 "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                 "recall_at_5":  0.73241,
+                                                                                 "mrr_at_10":  0.622925
+                                                                             },
+                                                         "JaGovFaqsRetrieval":  {
+                                                                                    "score":  0.70656,
+                                                                                    "subset":  "default",
+                                                                                    "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                    "recall_at_5":  0.79541,
+                                                                                    "mrr_at_10":  0.661844
+                                                                                },
+                                                         "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                "score":  0.95922,
+                                                                                                "subset":  "default",
+                                                                                                "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                                "recall_at_5":  0.98627,
+                                                                                                "mrr_at_10":  0.947491
+                                                                                            },
+                                                         "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                  "score":  0.91644,
+                                                                                                  "subset":  "default",
+                                                                                                  "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                                  "recall_at_5":  0.96863,
+                                                                                                  "mrr_at_10":  0.894531
+                                                                                              },
+                                                         "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                "score":  0.97102,
+                                                                                                "subset":  "default",
+                                                                                                "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                                "recall_at_5":  0.9902,
+                                                                                                "mrr_at_10":  0.962554
+                                                                                            },
+                                                         "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                  "score":  0.95282,
+                                                                                                  "subset":  "default",
+                                                                                                  "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                                  "recall_at_5":  0.98431,
+                                                                                                  "mrr_at_10":  0.940294
+                                                                                              },
+                                                         "JaCWIRRetrieval":  {
+                                                                                 "score":  0.85086,
+                                                                                 "subset":  "default",
+                                                                                 "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                 "recall_at_5":  0.8945,
+                                                                                 "mrr_at_10":  0.828431
+                                                                             },
+                                                         "MIRACLRetrieval":  null,
+                                                         "MintakaRetrieval":  {
+                                                                                  "score":  0.21454,
+                                                                                  "subset":  "ja",
+                                                                                  "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                  "recall_at_5":  0.25303,
+                                                                                  "mrr_at_10":  0.183325
+                                                                              },
+                                                         "MultiLongDocRetrieval":  {
+                                                                                       "score":  0.51267,
+                                                                                       "subset":  "ja",
+                                                                                       "revision":  "5617a9f61b028005a4858fdac845db406aefb181",
+                                                                                       "recall_at_5":  0.56,
+                                                                                       "mrr_at_10":  0.482472
+                                                                                   }
+                                                     },
+                                     "google/embeddinggemma-300m":  {
+                                                                        "JaqketRetrieval":  {
+                                                                                                "score":  0.6749,
+                                                                                                "subset":  "default",
+                                                                                                "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                "recall_at_5":  0.75928,
+                                                                                                "mrr_at_10":  0.630798
+                                                                                            },
+                                                                        "MrTidyRetrieval":  {
+                                                                                                "score":  0.54898,
+                                                                                                "subset":  "japanese",
+                                                                                                "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                "recall_at_5":  0.64306,
+                                                                                                "mrr_at_10":  0.505622
+                                                                                            },
+                                                                        "JaGovFaqsRetrieval":  {
+                                                                                                   "score":  0.72094,
+                                                                                                   "subset":  "default",
+                                                                                                   "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                   "recall_at_5":  0.81592,
+                                                                                                   "mrr_at_10":  0.6757
+                                                                                               },
+                                                                        "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                               "score":  0.96275,
+                                                                                                               "subset":  "default",
+                                                                                                               "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                               "recall_at_5":  0.98627,
+                                                                                                               "mrr_at_10":  0.953613
+                                                                                                           },
+                                                                        "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                                 "score":  0.92313,
+                                                                                                                 "subset":  "default",
+                                                                                                                 "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                                 "recall_at_5":  0.96275,
+                                                                                                                 "mrr_at_10":  0.904809
+                                                                                                             },
+                                                                        "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                               "score":  0.97571,
+                                                                                                               "subset":  "default",
+                                                                                                               "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                               "recall_at_5":  0.9902,
+                                                                                                               "mrr_at_10":  0.968861
+                                                                                                           },
+                                                                        "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                                 "score":  0.9866,
+                                                                                                                 "subset":  "default",
+                                                                                                                 "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                                 "recall_at_5":  0.99412,
+                                                                                                                 "mrr_at_10":  0.982816
+                                                                                                             },
+                                                                        "JaCWIRRetrieval":  {
+                                                                                                "score":  0.85239,
+                                                                                                "subset":  "default",
+                                                                                                "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                "recall_at_5":  0.902,
+                                                                                                "mrr_at_10":  0.828696
+                                                                                            },
+                                                                        "MIRACLRetrieval":  {
+                                                                                                "score":  0.65416,
+                                                                                                "subset":  "ja",
+                                                                                                "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                "recall_at_5":  0.69513,
+                                                                                                "mrr_at_10":  0.665146
+                                                                                            },
+                                                                        "MintakaRetrieval":  {
+                                                                                                 "score":  0.26827,
+                                                                                                 "subset":  "ja",
+                                                                                                 "revision":  "57c266a740f537b4dc058e1b0cda161fd15afa75",
+                                                                                                 "recall_at_5":  0.32785,
+                                                                                                 "mrr_at_10":  0.22744
+                                                                                             },
+                                                                        "MultiLongDocRetrieval":  null
+                                                                    },
+                                     "nvidia/Nemotron-3-Embed-1B-BF16":  {
+                                                                             "JaqketRetrieval":  null,
+                                                                             "MrTidyRetrieval":  null,
+                                                                             "JaGovFaqsRetrieval":  null,
+                                                                             "NLPJournalTitleAbsRetrieval.V2":  null,
+                                                                             "NLPJournalTitleIntroRetrieval.V2":  null,
+                                                                             "NLPJournalAbsIntroRetrieval.V2":  null,
+                                                                             "NLPJournalAbsArticleRetrieval.V2":  null,
+                                                                             "JaCWIRRetrieval":  null,
+                                                                             "MIRACLRetrieval":  null,
+                                                                             "MintakaRetrieval":  null,
+                                                                             "MultiLongDocRetrieval":  null
+                                                                         },
+                                     "LiquidAI/LFM2.5-Embedding-350M":  {
+                                                                            "JaqketRetrieval":  null,
+                                                                            "MrTidyRetrieval":  null,
+                                                                            "JaGovFaqsRetrieval":  null,
+                                                                            "NLPJournalTitleAbsRetrieval.V2":  null,
+                                                                            "NLPJournalTitleIntroRetrieval.V2":  null,
+                                                                            "NLPJournalAbsIntroRetrieval.V2":  null,
+                                                                            "NLPJournalAbsArticleRetrieval.V2":  null,
+                                                                            "JaCWIRRetrieval":  null,
+                                                                            "MIRACLRetrieval":  null,
+                                                                            "MintakaRetrieval":  null,
+                                                                            "MultiLongDocRetrieval":  null
+                                                                        },
+                                     "Qwen/Qwen3-Embedding-0.6B":  {
+                                                                       "JaqketRetrieval":  null,
+                                                                       "MrTidyRetrieval":  null,
+                                                                       "JaGovFaqsRetrieval":  {
+                                                                                                  "score":  0.67816,
+                                                                                                  "subset":  "default",
+                                                                                                  "revision":  "b22da495047858cce924d27d76261e96be6febc0",
+                                                                                                  "recall_at_5":  0.76172,
+                                                                                                  "mrr_at_10":  0.634598
+                                                                                              },
+                                                                       "NLPJournalTitleAbsRetrieval.V2":  {
+                                                                                                              "score":  0.95214,
+                                                                                                              "subset":  "default",
+                                                                                                              "revision":  "b22da495047858cce924d27d76261e96be6febc0",
+                                                                                                              "recall_at_5":  0.98431,
+                                                                                                              "mrr_at_10":  0.940019
+                                                                                                          },
+                                                                       "NLPJournalTitleIntroRetrieval.V2":  {
+                                                                                                                "score":  0.92803,
+                                                                                                                "subset":  "default",
+                                                                                                                "revision":  "b22da495047858cce924d27d76261e96be6febc0",
+                                                                                                                "recall_at_5":  0.97059,
+                                                                                                                "mrr_at_10":  0.911162
+                                                                                                            },
+                                                                       "NLPJournalAbsIntroRetrieval.V2":  {
+                                                                                                              "score":  0.98265,
+                                                                                                              "subset":  "default",
+                                                                                                              "revision":  "b22da495047858cce924d27d76261e96be6febc0",
+                                                                                                              "recall_at_5":  0.9902,
+                                                                                                              "mrr_at_10":  0.978241
+                                                                                                          },
+                                                                       "NLPJournalAbsArticleRetrieval.V2":  {
+                                                                                                                "score":  0.99539,
+                                                                                                                "subset":  "default",
+                                                                                                                "revision":  "b22da495047858cce924d27d76261e96be6febc0",
+                                                                                                                "recall_at_5":  0.99804,
+                                                                                                                "mrr_at_10":  0.99451
+                                                                                                            },
+                                                                       "JaCWIRRetrieval":  {
+                                                                                               "score":  0.8311,
+                                                                                               "subset":  "default",
+                                                                                               "revision":  "b22da495047858cce924d27d76261e96be6febc0",
+                                                                                               "recall_at_5":  0.88025,
+                                                                                               "mrr_at_10":  0.805819
+                                                                                           },
+                                                                       "MIRACLRetrieval":  null,
+                                                                       "MintakaRetrieval":  {
+                                                                                                "score":  0.25324,
+                                                                                                "subset":  "ja",
+                                                                                                "revision":  "b22da495047858cce924d27d76261e96be6febc0",
+                                                                                                "recall_at_5":  0.30926,
+                                                                                                "mrr_at_10":  0.214558
+                                                                                            },
+                                                                       "MultiLongDocRetrieval":  null
+                                                                   },
+                                     "Alibaba-NLP/gte-multilingual-base":  {
+                                                                               "JaqketRetrieval":  null,
+                                                                               "MrTidyRetrieval":  null,
+                                                                               "JaGovFaqsRetrieval":  {
+                                                                                                          "score":  0.63568,
+                                                                                                          "subset":  "default",
+                                                                                                          "revision":  "7fc06782350c1a83f88b15dd4b38ef853d3b8503",
+                                                                                                          "recall_at_5":  0.72266,
+                                                                                                          "mrr_at_10":  0.586305
+                                                                                                      },
+                                                                               "NLPJournalTitleAbsRetrieval.V2":  null,
+                                                                               "NLPJournalTitleIntroRetrieval.V2":  null,
+                                                                               "NLPJournalAbsIntroRetrieval.V2":  null,
+                                                                               "NLPJournalAbsArticleRetrieval.V2":  null,
+                                                                               "JaCWIRRetrieval":  null,
+                                                                               "MIRACLRetrieval":  null,
+                                                                               "MintakaRetrieval":  null,
+                                                                               "MultiLongDocRetrieval":  null
+                                                                           },
+                                     "Snowflake/snowflake-arctic-embed-m-v2.0":  {
+                                                                                     "JaqketRetrieval":  null,
+                                                                                     "MrTidyRetrieval":  null,
+                                                                                     "JaGovFaqsRetrieval":  {
+                                                                                                                "score":  0.64779,
+                                                                                                                "subset":  "default",
+                                                                                                                "revision":  "f2a7d59d80dfda5b1d14f096f3ce88bb6bf9ebdc",
+                                                                                                                "recall_at_5":  0.73682,
+                                                                                                                "mrr_at_10":  0.601475
+                                                                                                            },
+                                                                                     "NLPJournalTitleAbsRetrieval.V2":  null,
+                                                                                     "NLPJournalTitleIntroRetrieval.V2":  null,
+                                                                                     "NLPJournalAbsIntroRetrieval.V2":  null,
+                                                                                     "NLPJournalAbsArticleRetrieval.V2":  null,
+                                                                                     "JaCWIRRetrieval":  null,
+                                                                                     "MIRACLRetrieval":  null,
+                                                                                     "MintakaRetrieval":  null,
+                                                                                     "MultiLongDocRetrieval":  null
+                                                                                 },
+                                     "ibm-granite/granite-embedding-107m-multilingual":  {
+                                                                                             "JaqketRetrieval":  null,
+                                                                                             "MrTidyRetrieval":  null,
+                                                                                             "JaGovFaqsRetrieval":  {
+                                                                                                                        "score":  0.61485,
+                                                                                                                        "subset":  "default",
+                                                                                                                        "revision":  "47db56afe692f731540413c67dd818ff492277e7",
+                                                                                                                        "recall_at_5":  0.69385,
+                                                                                                                        "mrr_at_10":  0.568927
+                                                                                                                    },
+                                                                                             "NLPJournalTitleAbsRetrieval.V2":  null,
+                                                                                             "NLPJournalTitleIntroRetrieval.V2":  null,
+                                                                                             "NLPJournalAbsIntroRetrieval.V2":  null,
+                                                                                             "NLPJournalAbsArticleRetrieval.V2":  null,
+                                                                                             "JaCWIRRetrieval":  null,
+                                                                                             "MIRACLRetrieval":  null,
+                                                                                             "MintakaRetrieval":  {
+                                                                                                                      "score":  0.20362,
+                                                                                                                      "subset":  "ja",
+                                                                                                                      "revision":  "47db56afe692f731540413c67dd818ff492277e7",
+                                                                                                                      "recall_at_5":  0.24913,
+                                                                                                                      "mrr_at_10":  0.174228
+                                                                                                                  },
+                                                                                             "MultiLongDocRetrieval":  null
+                                                                                         },
+                                     "nomic-ai/nomic-embed-text-v2-moe":  {
+                                                                              "JaqketRetrieval":  null,
+                                                                              "MrTidyRetrieval":  null,
+                                                                              "JaGovFaqsRetrieval":  null,
+                                                                              "NLPJournalTitleAbsRetrieval.V2":  null,
+                                                                              "NLPJournalTitleIntroRetrieval.V2":  null,
+                                                                              "NLPJournalAbsIntroRetrieval.V2":  null,
+                                                                              "NLPJournalAbsArticleRetrieval.V2":  null,
+                                                                              "JaCWIRRetrieval":  null,
+                                                                              "MIRACLRetrieval":  null,
+                                                                              "MintakaRetrieval":  null,
+                                                                              "MultiLongDocRetrieval":  null
+                                                                          }
+                                 },
+    "other_japanese_datasets":  {
+                                    "nvidia__Nemotron-3-Embed-1B-BF16":  {
+                                                                             "JapaneseLegal1Retrieval":  0.85401
+                                                                         },
+                                    "Qwen__Qwen3-Embedding-0.6B":  {
+                                                                       "JapaneseLegal1Retrieval":  0.74144
+                                                                   },
+                                    "cl-nagoya__ruri-v3-310m":  {
+
+                                                                },
+                                    "cl-nagoya__ruri-v3-130m":  {
+
+                                                                },
+                                    "google__embeddinggemma-300m":  {
+
+                                                                    },
+                                    "BAAI__bge-m3":  {
+                                                         "JapaneseLegal1Retrieval":  0.70381
+                                                     }
+                                }
+}

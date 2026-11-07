@@ -1,0 +1,47 @@
+{
+  "title": "Nano 專案環境建立與 env check",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "環境檢查",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "Nano 能不能用 uv sync 從頭建立本專案環境，並通過 memrag env check（含實際 GPU 運算與 ChromaDB 讀寫）？",
+  "environment": [
+    "robo@172.28.0.147，~/50019/rag_test",
+    "Python 3.11.16（uv 管理）；uv.lock 由 Windows 產生，涵蓋兩個平台",
+    "常駐服務執行中，可用記憶體約 2.3 GiB"
+  ],
+  "method": [
+    "nano_sync.ps1 同步後執行 uv sync",
+    "uv run memrag env check"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["檢查項目", "結果"],
+      "rows": [
+        ["Python", "3.11.16，aarch64"],
+        ["套件", "torch 2.15.0+cu132、transformers 5.22.2、sentence-transformers 6.2.0、chromadb 1.5.9、huggingface-hub 2.4.0、numpy 2.4.6"],
+        ["GPU", "Orin，capability 8.7，CUDA 13.2；512×512 矩陣乘法與 CPU 結果最大差 9.9e-05"],
+        ["ChromaDB", "寫入 3 筆，依 person_id 過濾後查回 m1、m3，筆數正確"],
+        ["磁碟", "uv sync 前後剩餘空間都是 15 GB"]
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "環境幾乎不佔磁碟",
+      "text": "uv 快取裡已有其他專案用過的 cp311 torch，安裝時以硬連結重用。.venv 帳面上 5.8 GB，實際沒有增加磁碟用量。"
+    },
+    {
+      "kind": "note",
+      "title": "第一次 GPU 初始化很慢",
+      "text": "env check 的 GPU 項目花了 48 秒，大部分是第一次初始化 CUDA。之後量測時每個模型的載入是 8–21 秒。"
+    }
+  ],
+  "conclusion": ["驗收的 env check 與 ChromaDB aarch64 讀寫都通過。"],
+  "next": ["下載模型並量測載入。"],
+  "sources": [{ "text": "memrag env check 輸出" }],
+  "related": [
+    { "id": "2026-11-06_aarch64-package-resolve", "relation": "當時只確認可解析，這次實際安裝" }
+  ]
+}

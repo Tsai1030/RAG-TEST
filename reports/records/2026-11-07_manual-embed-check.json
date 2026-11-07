@@ -1,0 +1,40 @@
+{
+  "title": "手動測試：memrag embed --explain",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "手動測試",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "5.1.2 的手動測試指令能不能用真實模型執行，並顯示實際送進模型的文字？",
+  "environment": [
+    "robo@172.28.0.147，常駐服務執行中",
+    "測試者：Claude（依 docs/manual_testing.md 的 5.1.2 章節）"
+  ],
+  "method": [
+    "uv run memrag embed テスト --model ruri-v3-130m --kind query --explain",
+    "同一指令改用 qwen3-emb-0.6b",
+    "uv run memrag embed テスト --model nope"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "預期", "實際"],
+      "rows": [
+        ["ruri-v3-130m", "512 維、長度 1、文字前加「検索クエリ: 」", "符合"],
+        ["qwen3-emb-0.6b", "1024 維、長度 1、文字前加 Instruct 指令", "符合，Query: 後面沒有空格，與官方寫法相同"],
+        ["不存在的模型", "列出可用模型並以結束碼 2 結束", "符合"]
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "單次指令的耗時",
+      "text": "單次執行的載入約 23–25 秒、第一次向量化 1.8–3.5 秒，包含 import 與第一次 CUDA 初始化，又沒有暖機，所以比載入量測的數字慢很多。延遲以載入量測紀錄為準。"
+    }
+  ],
+  "conclusion": ["手動測試指令可用，prefix 顯示正確。"],
+  "next": [],
+  "sources": [{ "text": "docs/manual_testing.md" }],
+  "related": [
+    { "id": "2026-11-07_load-probe", "relation": "暖機後的延遲數字" }
+  ]
+}

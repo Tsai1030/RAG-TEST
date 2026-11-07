@@ -1,0 +1,46 @@
+{
+  "title": "專案骨架與 Library 開發測試（Windows）",
+  "date": "2026-11-07",
+  "task": "5.1.2",
+  "type": "自動測試",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "新建的專案骨架、模型 registry、CLI 與架構規則，在 Windows 上能不能通過不需要模型的測試？",
+  "environment": [
+    "Windows 筆電，Python 3.11.16（uv 管理），torch 2.15.0+cpu、transformers 5.22.2、sentence-transformers 6.2.0、chromadb 1.5.9",
+    "開發中反覆執行，依規則合併成一筆"
+  ],
+  "method": [
+    "uv run pytest -q：分層規則（import-linter）、README 覆蓋、registry 驗證、prefix 規則、Fake 實作的契約測試、ChromaDB 讀寫、CLI",
+    "真實模型的測試在 Windows 自動略過，改在 Nano 執行"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "columns": ["項目", "結果"],
+      "rows": [
+        ["執行次數", "完整測試 6 次，另跑單元測試 1 次"],
+        ["最後結果", "63 通過、48 略過（真實模型），0 失敗"],
+        ["分層規則", "4 條 import-linter 規則全部通過"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "過程中出現過的失敗",
+      "columns": ["問題", "處理"],
+      "rows": [
+        ["契約測試的參數寫法錯誤，無法收集測試", "改正 pytest 參數格式"],
+        ["ChromaDB 在 Windows 刪除暫存資料夾時檔案仍被佔用", "先釋放 client 再清理；讀寫本身正常"],
+        ["新資料夾還沒有 README", "補齊所有資料夾的 README"],
+        ["import-linter 產生的 .import_linter_cache 沒列在 README", "加入略過清單、.gitignore 與同步排除"],
+        ["量測用的記憶體取樣執行緒在 Nano 當掉（見載入量測第 1 次）", "修正後補上單元測試 test_probe_sampler.py"]
+      ]
+    }
+  ],
+  "conclusion": ["Windows 上不需要模型的部分全部通過；真實模型要看 Nano 的結果。"],
+  "next": ["在 Nano 跑完整測試，包含真實模型。"],
+  "sources": [{ "text": "tests/" }, { "text": "pyproject.toml（分層規則）" }],
+  "related": [
+    { "id": "2026-11-07_nano-contract-tests", "relation": "Nano 上的完整測試" }
+  ]
+}

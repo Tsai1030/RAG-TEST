@@ -1,0 +1,94 @@
+{
+  "title": "候選 Embedding 模型調查",
+  "date": "2026-11-07",
+  "task": "5.1.1",
+  "type": "模型調查",
+  "status": "部分完成",
+  "backfilled": false,
+  "purpose": "有哪些日文可用的 Embedding 模型？哪些值得在 Nano 上實測？",
+  "environment": [
+    "Windows 開發機查閱公開資料，沒有在 Nano 載入任何模型",
+    "MTEB 結果庫 commit：922b3df446f88756d954e4099b7211bcafaf99c9",
+    "run_id、資料 hash：N/A"
+  ],
+  "method": [
+    "用 Hugging Face API 取得固定 revision、授權與實際權重大小",
+    "讀取 config.json、sentence_bert_config.json 與模型卡，確認維度、最大長度、prefix 與依賴",
+    "從 MTEB 結果庫下載 11 個 JMTEB Retrieval 資料集的日文 nDCG@10，並在 7 個共同資料集上計算平均",
+    "用 Hugging Face 的日文模型清單與網路搜尋，找出計畫書沒有列到的模型"
+  ],
+  "results": [
+    {
+      "kind": "note",
+      "title": "這不是實測結果",
+      "text": "以下都是公開資料，分數來自文件檢索資料集，不是對話記憶，只用來篩選。權重大小也不等於執行時的記憶體用量。"
+    },
+    {
+      "kind": "table",
+      "caption": "7 個共同資料集的日文 nDCG@10（平均值為本調查自算）",
+      "columns": ["模型", "7 個資料集平均", "JaGovFaqs", "JaCWIR", "Mintaka", "權重（MiB）", "商用"],
+      "numeric": [1, 2, 3, 4, 5],
+      "rows": [
+        ["Sarashina v2", "85.54", "75.61", "85.52", "43.65", "4,669", "否"],
+        ["ruri-v3-310m", "83.98", "77.26", "84.05", "33.53", "1,200", "可"],
+        ["Sarashina v1", "83.84", "72.23", "82.54", "40.25", "4,669", "否"],
+        ["ruri-v3-130m", "83.80", "77.29", "83.49", "32.83", "504", "可"],
+        ["ruri-v3-70m", "82.45", "74.61", "82.01", "29.74", "267", "可"],
+        ["ruri-v3-30m", "81.94", "72.36", "81.93", "28.36", "140", "可"],
+        ["EmbeddingGemma", "81.28", "72.09", "85.24", "26.83", "1,155", "依條款"],
+        ["Qwen3-Embedding-0.6B", "80.30", "67.82", "83.11", "25.32", "1,136", "可"],
+        ["BGE-M3", "79.59", "70.66", "85.09", "21.45", "2,166", "可"],
+        ["multilingual-e5-small", "72.71", "65.56", "85.54", "20.70", "449", "可"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "只有模型卡分數的模型（舊版 JMTEB Retrieval，基準不同，不可和上表直接比較）",
+      "columns": ["模型", "舊版 Retrieval", "同表對照 ruri-v3-310m", "權重（MiB）", "商用"],
+      "numeric": [1, 2, 3],
+      "rows": [
+        ["PLaMo-Embedding-1B", "79.94", "81.89", "2,004", "可"],
+        ["GLuCoSE-base-ja-v2", "73.36", "81.89", "508", "可"],
+        ["RoSEtta-base-ja", "73.21", "—", "726", "可"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "建議名單（最後由 5.1.2 決定）",
+      "columns": ["建議", "模型", "理由"],
+      "rows": [
+        ["首輪", "ruri-v3-30m", "最小，可測品質下限與延遲上限"],
+        ["首輪", "ruri-v3-130m", "分數接近 310m，權重不到一半"],
+        ["首輪", "ruri-v3-310m", "可商用模型中，共同資料集分數最高"],
+        ["首輪", "GLuCoSE-base-ja-v2", "不同家族的日文模型，增加多樣性"],
+        ["首輪", "Qwen3-Embedding-0.6B", "無須申請、可商用的新一代多語模型"],
+        ["首輪", "multilingual-e5-small", "輕量且廣泛使用的多語基準"],
+        ["備選", "EmbeddingGemma", "分數略高於 Qwen3，但要登入並同意條款"],
+        ["備選", "Nemotron-3-Embed-1B", "日文法律資料集分數亮眼，但約 2.1 GiB，沒有 JMTEB 分數"],
+        ["備選", "PLaMo-Embedding-1B", "舊版分數比 ruri-v3-130m 低，權重卻是 4 倍"],
+        ["不列入", "Sarashina v1、v2", "非商用（D3），約 4.6 GiB 也超過記憶體門檻"],
+        ["不列入", "LFM2.5-Embedding-350M", "授權有營收限制，也沒有可比較的分數"],
+        ["不列入", "BGE-M3、RoSEtta、ruri-v3-70m", "分數或體積沒有優勢"]
+      ]
+    }
+  ],
+  "conclusion": [
+    "建議首輪 6 個模型，權重合計約 3.84 GiB，符合約 4 GB 的候選預算。",
+    "ruri-v3-130m 是目前最值得注意的候選：分數和 310m 幾乎相同，權重不到一半。",
+    "修正計畫書：PLaMo 權重約 2.0 GiB，不是原本估計的 4 GB。",
+    "驗收的 CLI 入口 memrag models list --source survey 要等 5.1.2 建好 Library 才能做，所以狀態是部分完成。"
+  ],
+  "next": [
+    "5.1.2 用固定 revision 下載模型，在 Nano 實測載入、記憶體與延遲，再決定最後名單。",
+    "確認所有模型能否共用同一個 transformers 版本。"
+  ],
+  "sources": [
+    { "text": "完整調查報告：docs/survey/model_survey.md" },
+    { "text": "逐資料集原始分數：docs/survey/mteb_japanese_retrieval.json" },
+    { "text": "MTEB 結果庫（查閱日 2026-11-07）", "url": "https://github.com/embeddings-benchmark/results" },
+    { "text": "ruri-v3-130m 模型卡（查閱日 2026-11-07）", "url": "https://huggingface.co/cl-nagoya/ruri-v3-130m" }
+  ],
+  "related": [
+    { "id": "2026-11-06_initial-model-card-check", "relation": "修正這筆紀錄的 PLaMo 權重估計" }
+  ]
+}
