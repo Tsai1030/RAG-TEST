@@ -849,7 +849,7 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 
 **驗收：** `selection_report.md` 與 ADR 完成；報告數字都能追溯到 `run_id`；審閱者能依文件重現主要結果。
 
-**狀態：** 依凍結規則的排名完成（`memrag select`，run_id `20261108-010358_selection`）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告、ADR 與 JMTEB 比較還沒寫；延遲與記憶體要在 5.1.7 與部署伺服器上確認。
+**狀態：** 依凍結規則的排名完成（`memrag select`，run_id `20261108-010358_selection`）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告（`docs/analysis/selection_report.md`，含失敗案例、穩健性檢查與 JMTEB 比較，排名相關 0.90）與 ADR 0001（提議中）已完成（2026-11-08）；5.1.5–5.1.7 在實際流程中確認、延遲與記憶體在部署伺服器確認後，ADR 改為「已採用」。
 
 ---
 

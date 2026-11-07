@@ -1246,7 +1246,7 @@ ruri-v3-130m:
         </ul>
         <dl class="outcome">
           <div><dt>驗收</dt><dd><code>selection_report.md</code> 與 ADR 完成；報告數字都能追溯到 <code>run_id</code>；審閱者能依文件重現主要結果。</dd></div>
-          <div><dt>狀態</dt><dd>依凍結規則的排名完成（<code>memrag select</code>，run_id <code>20261108-010358_selection</code>）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告、ADR 與 JMTEB 比較還沒寫；延遲與記憶體要在 5.1.7 與部署伺服器上確認。</dd></div>
+          <div><dt>狀態</dt><dd>依凍結規則的排名完成（<code>memrag select</code>，run_id <code>20261108-010358_selection</code>）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告（<code>docs/analysis/selection_report.md</code>，含失敗案例、穩健性檢查與 JMTEB 比較，排名相關 0.90）與 ADR 0001（提議中）已完成（2026-11-08）；5.1.5–5.1.7 在實際流程中確認、延遲與記憶體在部署伺服器確認後，ADR 改為「已採用」。</dd></div>
         </dl>
       </article>
     </section>
@@ -1427,7 +1427,8 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   "conclusion": "主選 ruri-v3-130m（Apache-2.0）；備選 ruri-v3-30m（最快，適合只有 CPU 的環境，但表記差異題較弱）。產品現用的 bge-base-zh-v1.5 建議替換。",
   "findings": [
     "測試集 nDCG@10（LLM 記憶庫、只搜本人）：ruri-v3-310m 0.872、ruri-v3-130m 0.864、Qwen3 0.863、ruri-v3-30m 0.859、e5-small 0.815、bge 0.690；前四名差距不顯著，e5 與 bge 顯著較差。",
-    "加權排名（nDCG 40%、Recall@5 25%、誤擋率 20%、延遲 10%、記憶體 5%）：ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097。",
+    "加權排名（nDCG 40%、Recall@5 25%、誤擋率 20%、延遲 10%、記憶體 5%）：ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097；權重 ±0.10、只看準確度、改用名次正規化，第一名都還是 ruri-v3-130m。",
+    "與公開 JMTEB 分數的排名相關係數 0.90；本專案的短記憶與口語問題讓前四名差距縮小到不顯著。所有模型在「先週なにしたっけ」這類時間題都只有 0.36–0.60，要靠日期過濾解決。",
     "閾值：開發集校準、測試集套用；無答案誤召回 4.6%–6.9%（信賴區間下限都 ≤ 5%，通過門檻），但正確記憶仍有 32%–53% 被擋，需要 LLM 判斷當第二層。",
     "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別 75%、日期 77% 正確，直接過濾會擋掉正確記憶。",
     "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
@@ -1502,7 +1503,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     "note": "準確度：測試集，只搜該使用者的記憶，精確搜尋；LLM 記憶庫有答案 106 題、標準事實 108 題，經池化審查補判；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "5.1.9：撰寫選型報告與 ADR。",
+    "選型報告（docs/analysis/selection_report.md）與 ADR 0001（提議中）已完成，請審閱。",
     "5.1.5–5.1.7：ChromaDB／HNSW、完整流程（含 LLM 判斷第二層、日期過濾的用法）與各階段量測，在實際流程中確認主選模型。"
   ],
   "tasks": [
@@ -1514,7 +1515,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
     { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "完成（精確搜尋）：開發集、閾值校準、測試集；HNSW 與 ranx 交叉驗證未做" },
-    { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "進行中：依凍結規則排名完成，主選 ruri-v3-130m；報告與 ADR 未寫" }
+    { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "完成（初步）：選型報告與 ADR 0001 提議主選 ruri-v3-130m、備選 ruri-v3-30m；待 5.1.5–5.1.7 確認後採用" }
   ]
 }
 ,"records":[{"id":"2026-11-07_glucose-transformers-compat","record":{
@@ -1908,7 +1909,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   "date": "2026-11-08",
   "task": "5.1.9",
   "type": "選型分析",
-  "status": "部分完成",
+  "status": "通過",
   "backfilled": false,
   "purpose": "依測試前凍結的 configs/selection.yaml，哪個 Embedding 模型最適合日文對話記憶？",
   "environment": [
@@ -1950,7 +1951,8 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
       "kind": "list",
       "items": [
         "5 個候選都通過硬性門檻：都可商用、只搜本人時沒有出現別人的記憶、誤召回下限 ≤ 5%、延遲與記憶體都遠低於門檻。",
-        "權重每項 ±0.05 時，第一名都還是 ruri-v3-130m。",
+        "權重每項 ±0.05 時，第一名都還是 ruri-v3-130m；另外的參考檢查（±0.10、延遲與記憶體權重歸零、改用名次正規化）第一名也都不變。",
+        "與公開 JMTEB 分數的排名相關係數 0.90：公開排名 310m > 130m > 30m > Qwen3 > e5，本專案 310m > 130m > Qwen3 > 30m > e5。",
         "平手規則：前四名 nDCG@10 差距不顯著，依規則選較輕量的模型；ruri-v3-130m 比 310m、Qwen3 輕，且加權第一。",
         "ruri-v3-130m 的優勢：Recall@5 最高、小候選集誤擋率最低、記憶體最省；在開發集的表記差異題也接近 310m（0.877 vs 0.902）。"
       ]
@@ -1958,7 +1960,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     {
       "kind": "note",
       "title": "還不是最終決定",
-      "text": "延遲與記憶體只有 Nano 上的載入量測，正式數字要等部署伺服器（D10）；HNSW 搜尋、完整流程與各階段量測（5.1.5–5.1.7）還沒做；選型報告與 ADR 尚未撰寫。標註由 Claude 進行，建議日後請日文母語者抽查。"
+      "text": "延遲與記憶體只有 Nano 上的載入量測，正式數字要等部署伺服器（D10）；HNSW 搜尋、完整流程與各階段量測（5.1.5–5.1.7）還沒做，所以 ADR 的狀態是「提議中」。標註由 Claude 進行，建議日後請日文母語者抽查。"
     }
   ],
   "conclusion": [
@@ -1966,10 +1968,11 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     "產品現用的 bge-base-zh-v1.5 在所有準確度指標都顯著落後，建議換成 ruri-v3-130m。"
   ],
   "next": [
-    "撰寫 selection_report.md 與 ADR。",
-    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程與各階段量測，確認主選模型在實際流程中的表現。"
+    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程與各階段量測，確認主選模型在實際流程中的表現後，ADR 改為「已採用」。"
   ],
   "sources": [
+    { "text": "docs/analysis/selection_report.md（選型報告）" },
+    { "text": "docs/adr/0001-embedding-model.md（ADR，提議中）" },
     { "text": "results/runs/20261108-010358_selection/selection.json" },
     { "text": "configs/selection.yaml" }
   ],

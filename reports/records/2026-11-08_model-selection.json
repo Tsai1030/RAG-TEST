@@ -3,7 +3,7 @@
   "date": "2026-11-08",
   "task": "5.1.9",
   "type": "選型分析",
-  "status": "部分完成",
+  "status": "通過",
   "backfilled": false,
   "purpose": "依測試前凍結的 configs/selection.yaml，哪個 Embedding 模型最適合日文對話記憶？",
   "environment": [
@@ -45,7 +45,8 @@
       "kind": "list",
       "items": [
         "5 個候選都通過硬性門檻：都可商用、只搜本人時沒有出現別人的記憶、誤召回下限 ≤ 5%、延遲與記憶體都遠低於門檻。",
-        "權重每項 ±0.05 時，第一名都還是 ruri-v3-130m。",
+        "權重每項 ±0.05 時，第一名都還是 ruri-v3-130m；另外的參考檢查（±0.10、延遲與記憶體權重歸零、改用名次正規化）第一名也都不變。",
+        "與公開 JMTEB 分數的排名相關係數 0.90：公開排名 310m > 130m > 30m > Qwen3 > e5，本專案 310m > 130m > Qwen3 > 30m > e5。",
         "平手規則：前四名 nDCG@10 差距不顯著，依規則選較輕量的模型；ruri-v3-130m 比 310m、Qwen3 輕，且加權第一。",
         "ruri-v3-130m 的優勢：Recall@5 最高、小候選集誤擋率最低、記憶體最省；在開發集的表記差異題也接近 310m（0.877 vs 0.902）。"
       ]
@@ -53,7 +54,7 @@
     {
       "kind": "note",
       "title": "還不是最終決定",
-      "text": "延遲與記憶體只有 Nano 上的載入量測，正式數字要等部署伺服器（D10）；HNSW 搜尋、完整流程與各階段量測（5.1.5–5.1.7）還沒做；選型報告與 ADR 尚未撰寫。標註由 Claude 進行，建議日後請日文母語者抽查。"
+      "text": "延遲與記憶體只有 Nano 上的載入量測，正式數字要等部署伺服器（D10）；HNSW 搜尋、完整流程與各階段量測（5.1.5–5.1.7）還沒做，所以 ADR 的狀態是「提議中」。標註由 Claude 進行，建議日後請日文母語者抽查。"
     }
   ],
   "conclusion": [
@@ -61,10 +62,11 @@
     "產品現用的 bge-base-zh-v1.5 在所有準確度指標都顯著落後，建議換成 ruri-v3-130m。"
   ],
   "next": [
-    "撰寫 selection_report.md 與 ADR。",
-    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程與各階段量測，確認主選模型在實際流程中的表現。"
+    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程與各階段量測，確認主選模型在實際流程中的表現後，ADR 改為「已採用」。"
   ],
   "sources": [
+    { "text": "docs/analysis/selection_report.md（選型報告）" },
+    { "text": "docs/adr/0001-embedding-model.md（ADR，提議中）" },
     { "text": "results/runs/20261108-010358_selection/selection.json" },
     { "text": "configs/selection.yaml" }
   ],
