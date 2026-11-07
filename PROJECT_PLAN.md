@@ -386,6 +386,8 @@ uv run memrag summarize d_p01_1027 --show-retries # 總結一場對話，列出�
 uv run memrag corpus build                    # 總結全部對話並凍結到 data/02_memories（Nano，用 nano_llm_session.sh）
 uv run memrag eval run --models all --split dev --corpus memories # 檢索準確度（gold：事實原文；memories：LLM 記憶）
 uv run memrag eval rescore results/runs/<run_id> # 標註更新後，沿用存下的向量重算
+uv run memrag eval calibrate results/runs/<dev run> --write # 校準閾值，寫入 configs/thresholds.yaml
+uv run memrag eval thresholds results/runs/<test run> # 用固定閾值評估小候選集
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
 uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
@@ -815,7 +817,8 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 - **LLM 記憶庫**（5.1.4 的 641 筆，run_id `20261107-235108_retrieval_eval_memories`，池化後重算 `20261107-235741_retrieval_rescore`）：ruri-v3-310m 0.902、ruri-v3-130m 0.888、ruri-v3-30m 0.868、Qwen3 0.851、e5-small 0.751、bge-base-zh-v1.5 0.680
 - 兩種記憶庫的排名一致，前四名的信賴區間重疊；LLM 記憶庫上日期／類別過濾會擋掉 metadata 有誤的正確記憶，時間題約 0.6（Gold Facts 上是 1.0）
 - **池化審查（2026-11-08 完成，開發集）：** 每題取 6 個模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶重新判斷，寫在 `data/02_memories/pool_labels.jsonl`；35 組調高、8 組調低
-- 指標函式通過手算案例；與 `ranx` 的交叉驗證、閾值校準、小候選集、HNSW 與測試集評估還沒做
+- **閾值校準與小候選集（2026-11-08 完成，開發集）：** 每題抽 2–10 筆的候選集（正例含 1 筆 2 分記憶，負例全是 0 分；有答案題拿掉相關記憶也當負例，因為無答案題只有 8 題），校準無答案誤召回 ≤ 5% 的最低閾值，寫入 `configs/thresholds.yaml`（run_id `20261108-004204_threshold_calibration`）。正確記憶誤擋率：ruri-v3-130m 29%、ruri-v3-310m 32%、ruri-v3-30m 34%、Qwen3 35%、e5-small 48%、bge 61%；單靠閾值會擋掉約 3 成的正確記憶，5.1.6 要保留 LLM 判斷這一層
+- 指標函式通過手算案例；與 `ranx` 的交叉驗證、HNSW 與測試集評估還沒做
 
 ### 5.1.9 Result Analysis & Embedding Model Selection
 

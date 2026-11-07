@@ -11,6 +11,7 @@ from memrag.infrastructure.embedding.registry import Registry, load_registry
 
 MODELS_CONFIG = Path("configs") / "models.yaml"
 PIPELINE_CONFIG = Path("configs") / "pipeline.yaml"
+THRESHOLDS_CONFIG = Path("configs") / "thresholds.yaml"
 PROMPTS_DIR = Path("prompts")
 DIALOGUES = Path("data") / "01_dialogues" / "dialogues.jsonl"
 MEMORIES_DIR = Path("data") / "02_memories"

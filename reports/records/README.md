@@ -21,7 +21,17 @@
 | `purpose` | 這次實驗想回答什麼問題 |
 | `environment` | 機器、版本、模型 revision 等環境資訊清單 |
 | `method` | 實際做法清單 |
-| `results` | 結果區塊清單；`kind` 為 `p`、`list`、`table` 或 `note` |
+| `results` | 結果區塊清單；`kind` 為 `p`、`list`、`table`、`note` 或 `chart` |
+
+`chart` 區塊在網頁上畫成 SVG 圖，`overview.json` 的 `charts` 也用同一個格式：
+
+| 欄位 | 說明 |
+|---|---|
+| `chart` | `dot`（點＋信賴區間，軸可不從 0 開始，用於差距小的比較）、`bar`（長條，軸從 0 開始）或 `scatter`（散佈圖） |
+| `caption`、`note` | 圖的標題與說明；標題寫清楚越高或越低越好 |
+| `categories`、`series` | `dot`／`bar` 用：每列一個類別；`series` 每項有 `name`、`values`，可加 `ci`（每個值的 `[下限, 上限]`） |
+| `min`、`max`、`digits`、`axisDigits` | 橫軸範圍、數值與刻度的小數位數 |
+| `x`、`y`、`points`、`legend` | `scatter` 用：軸的 `min`、`max`、`digits`、`label`；每個點有 `label`、`x`、`y`，`group` 決定顏色，`dy` 微調標籤位置 |
 | `conclusion`、`next` | 結論與下一步清單 |
 | `sources` | 來源清單；`text` 必填，`url` 選填 |
 | `related` | 相關紀錄清單；`id` 是紀錄 ID，`relation` 說明關係；指向 `log/` 的紀錄不會顯示在網頁上 |

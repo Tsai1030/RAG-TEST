@@ -1,0 +1,26 @@
+# Score thresholds per model (plan 5.1.8). Written by `memrag eval calibrate --write`;
+# commit before evaluating the test set and do not edit by hand.
+calibrated_on: 20261107-235108_retrieval_eval_memories
+calibration_run: 20261108-004204_threshold_calibration
+corpus_sha256: 2bd13bef3b151319f0d28a69b8368c982a66aac1f29d5ea6ca7af36e9c35f9ca
+pool_labels_sha256: 56e85622128bd17873b3c897cb60e47b333971bfbcc70868739b1d35f84bc6ef
+target_false_recall: 0.05
+sizes:
+- 2
+- 3
+- 4
+- 5
+- 6
+- 7
+- 8
+- 9
+- 10
+samples_per_size: 10
+seed: 0
+thresholds:
+  ruri-v3-30m: 0.8627
+  ruri-v3-130m: 0.849
+  ruri-v3-310m: 0.8622
+  qwen3-emb-0.6b: 0.4547
+  e5-small: 0.8441
+  bge-base-zh-v1.5: 0.5812

@@ -8,6 +8,8 @@
 |---|---|---|---|---|
 | `README.md` | 檔案 | 本文件：說明這個資料夾的內容 | 手動維護 | 是 |
 | `models.yaml` | 檔案 | 模型 registry：Hugging Face ID、固定的 revision、維度、prefix、精度、授權 | 手動維護，修改後要跑 `uv run pytest tests/contract` | 是 |
+| `selection.yaml` | 檔案 | 選型規則（計畫 5.1.9）：測試集用哪個記憶庫與搜尋範圍、硬性門檻、加權方式與權重、平手規則；測試集評估前凍結 | 手動維護，2026-11-08 凍結；之後要改就升版並在報告註明 | 是 |
+| `thresholds.yaml` | 檔案 | 各模型的分數閾值，以及校準用的語料與標註 hash、抽樣設定；評估測試集前要先提交 | `memrag eval calibrate <開發集的記憶庫評估> --write` 產生，不要手動修改 | 是 |
 | `pipeline.yaml` | 檔案 | 流程設定：總結用 LLM（自己的 llama-server 位址、GGUF 的 revision、temperature、seed）、prompt 版本、快取位置、拒答文字 | 手動維護；改 LLM 或參數後快取自動失效 | 是 |
 
 ## models.yaml 欄位

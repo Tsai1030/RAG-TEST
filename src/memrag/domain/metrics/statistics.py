@@ -50,6 +50,25 @@ def paired_bootstrap_ci(a: Sequence[float], b: Sequence[float], samples: int = B
     return bootstrap_ci([x - y for x, y in zip(a, b)], samples, seed)
 
 
+def cluster_bootstrap_rate(groups: Sequence[Sequence[bool]], samples: int = BOOTSTRAP_SAMPLES,
+                           seed: int = 0) -> tuple[float, float]:
+    """95% interval of a rate whose outcomes come in correlated groups (e.g. many sets per query).
+
+    Whole groups are resampled, so the interval reflects the number of queries, not of sets.
+    """
+    if not groups or not any(groups):
+        raise ValueError("no outcomes")
+    rng = random.Random(seed)
+    n = len(groups)
+    rates = []
+    for _ in range(samples):
+        picked = [groups[rng.randrange(n)] for _ in range(n)]
+        total = sum(len(g) for g in picked)
+        rates.append(sum(sum(g) for g in picked) / total if total else 0.0)
+    rates.sort()
+    return rates[int(0.025 * samples)], rates[int(0.975 * samples) - 1]
+
+
 def auc(positives: Sequence[float], negatives: Sequence[float]) -> float:
     """Probability that a random positive scores above a random negative (ties count half)."""
     if not positives or not negatives:

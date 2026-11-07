@@ -27,6 +27,51 @@ def register(sub) -> None:
     s.add_argument("--json", action="store_true")
     s.set_defaults(handler=run_rescore)
 
+    c = p.add_parser("calibrate", help="在開發集的小候選集（2–10 筆）上校準各模型的閾值（無答案誤召回率 ≤ 5%）")
+    c.add_argument("run_dir", help="開發集、--corpus memories 的 results/runs/<run_id>")
+    c.add_argument("--write", action="store_true", help="寫入 configs/thresholds.yaml；沒加只預覽")
+    c.add_argument("--note", default="")
+    c.add_argument("--json", action="store_true")
+    c.set_defaults(handler=run_calibrate)
+
+    t = p.add_parser("thresholds", help="用 configs/thresholds.yaml 的固定閾值評估小候選集（例如測試集）")
+    t.add_argument("run_dir")
+    t.add_argument("--note", default="")
+    t.add_argument("--json", action="store_true")
+    t.set_defaults(handler=run_thresholds)
+
+
+def run_calibrate(args) -> int:
+    out = memrag.calibrate_thresholds(args.run_dir, write=args.write, note=args.note)
+    _print_thresholds(out, args.json)
+    if not args.json:
+        print("已寫入 configs/thresholds.yaml" if out["written"] else "預覽：加 --write 才會寫入 configs/thresholds.yaml")
+    return 0
+
+
+def run_thresholds(args) -> int:
+    return _print_thresholds(memrag.evaluate_thresholds(args.run_dir, note=args.note), args.json)
+
+
+def _fmt(rate: dict | None) -> str:
+    return "     —" if rate is None else f"{rate['rate']:6.3f}"
+
+
+def _print_thresholds(out: dict, as_json: bool) -> int:
+    from memrag.interfaces.cli.main import print_json
+
+    if as_json:
+        print_json(out)
+        return 0
+    print(f"結果資料夾：{out['run_dir']}")
+    print(f"  {'模型':<24}{'閾值':>7}{'無答誤召回':>10}{'正確誤擋':>9}{'誤擋(2筆)':>10}{'誤擋(10筆)':>11}{'錯誤通過':>9}{'Top-1錯':>8}")
+    for model, r in out["models"].items():
+        a, s2, s10 = r["by_size"]["all"], r["by_size"].get("2"), r["by_size"].get("10")
+        print(f"  {model:<24}{r['threshold']:>7.3f}{_fmt(a['false_recall']):>10}{_fmt(a['false_block']):>9}"
+              f"{_fmt(s2 and s2['false_block']):>10}{_fmt(s10 and s10['false_block']):>11}"
+              f"{a['wrong_pass_rate'] if a['wrong_pass_rate'] is not None else float('nan'):>9.3f}{_fmt(a['top1_wrong']):>8}")
+    return 0
+
 
 def run_eval(args) -> int:
     out = memrag.evaluate_retrieval(args.models, None if args.split == "all" else args.split,

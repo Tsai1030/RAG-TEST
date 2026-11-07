@@ -1,0 +1,38 @@
+# Model selection rules (plan 5.1.9). Frozen 2026-11-08, before the test set is evaluated.
+# Changing anything here after the test-set run needs a new version and a note in the report.
+version: 1
+
+# What the test-set numbers are computed on
+evaluation:
+  split: test
+  corpus: memories            # data/02_memories (Qwen3-4B summaries), pooled labels applied
+  scope: person               # only the asker's memories; date/category filters are a 5.1.6 pipeline
+                              # decision and depend on the summarizer's metadata, not on the embedding model
+  search: exact
+  thresholds: configs/thresholds.yaml   # calibrated on the dev set, fixed for the test set
+
+candidates_only: true         # bge-base-zh-v1.5 is the baseline (role: baseline) and is not ranked
+
+# Stage 1: a model failing any gate is not ranked
+hard_gates:
+  commercial_license: true                  # D3, from configs/models.yaml commercial_ok
+  person_filter_cross_user_errors: 0        # top-k under the person scope never holds another user's memory
+  small_set_false_recall_ci_low_max: 0.05   # no-answer false recall on 2–10 memory sets, lower bound of the 95% interval
+  query_latency_p95_ms_max: 500             # Nano CUDA single query, until the server spec is known (D10)
+  memory_peak_gib_max: 3.0                  # Nano system memory peak of the embedding model
+
+# Stage 2: weighted score. Each metric is min-max normalised across the candidates that passed
+# the gates (best = 1, worst = 0); "lower" metrics are inverted first. Score = sum(weight * value).
+weights:
+  ndcg@10:                {weight: 0.40, better: higher}
+  recall@5:               {weight: 0.25, better: higher}
+  small_set_false_block:  {weight: 0.20, better: lower}
+  query_latency_p95_ms:   {weight: 0.10, better: lower}   # load probe, Nano CUDA, batch 1
+  memory_peak_mib:        {weight: 0.05, better: lower}   # load probe, Nano CUDA system memory peak
+  # index build time: reported only, not scored
+
+# Decision rule
+tie_rule: >-
+  If the top models' nDCG@10 difference is not significant (paired bootstrap 95% interval
+  contains 0), prefer the lighter model with the simpler license; report the weighted
+  ranking and a weight sensitivity check (each weight +/- 0.05) next to the decision.

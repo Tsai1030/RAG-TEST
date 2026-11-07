@@ -369,19 +369,16 @@ def _metrics(per_model: dict[str, list[dict]], timing: dict[str, dict] | None = 
     }
 
 
-def rescore_retrieval(run_dir: str, note: str = "") -> dict:
-    """Score a finished evaluation again with the current labels, reusing its saved vectors.
+def _load_run(run_dir: str):
+    """A finished `eval run`: its manifest, the current evaluation input, and each model's saved vectors.
 
-    No model is loaded, so it runs anywhere (also on Windows). Refuses when the corpus or
-    the queries changed since the run. Writes a new results/runs/<run_id>_retrieval_rescore/.
+    Refuses when the corpus, documents or queries changed since the run.
     """
     import json
 
     import numpy as np
 
-    from memrag.application.evaluation.retrieval_eval import PRIMARY_SCOPE, rank
     from memrag.domain.errors import ConfigError
-    from memrag.infrastructure.storage.manifest import append_jsonl, new_run_dir, write_json
 
     source = Path(run_dir)
     old = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
@@ -389,21 +386,109 @@ def rescore_retrieval(run_dir: str, note: str = "") -> dict:
     data, corpus_info = _retrieval_input(corpus, None if old["split"] == "all" else old["split"])
     if old.get("corpus_sha256") != corpus_info.get("corpus_sha256"):
         raise ConfigError(f"{source.name}: the corpus changed since this run; run `memrag eval run` again")
-    root = bootstrap.project_root()
-    out = new_run_dir(root, "retrieval_rescore")
-    per_model = {}
     order = list(old.get("models") or {})
     paths = sorted((source / "vectors").glob("*.npz"),
                    key=lambda p: (order.index(p.stem) if p.stem in order else len(order), p.stem))
+    vectors = {}
     for path in paths:
         vec = np.load(path)
         if list(vec["doc_ids"]) != [d.doc_id for d in data.docs] or \
                 list(vec["query_ids"]) != [q.query_id for q in data.queries]:
             raise ConfigError(f"{path.name}: documents or queries differ from the current data")
-        rows = rank(vec["queries"], vec["documents"], data)
+        vectors[path.stem] = (vec["queries"], vec["documents"])
+    return source, old, data, corpus_info, vectors
+
+
+def calibrate_thresholds(run_dir: str, write: bool = False, note: str = "") -> dict:
+    """Calibrate each model's score threshold on small candidate sets of a dev-split memory run.
+
+    Writes results/runs/<run_id>_threshold_calibration/; with `write`, also configs/thresholds.yaml,
+    which must be committed before the test set is evaluated (plan 5.1.8).
+    """
+    import yaml
+
+    from memrag.application.evaluation import thresholds as th
+    from memrag.domain.errors import ConfigError
+    from memrag.infrastructure.storage.manifest import new_run_dir, write_json
+
+    source, old, data, corpus_info, vectors = _load_run(run_dir)
+    if corpus_info["split"] != "dev" or corpus_info["corpus_name"] != "memories":
+        raise ConfigError("calibrate on a dev-split run with --corpus memories")
+    sets = th.candidate_sets(data)
+    results = {}
+    for model, (query_vecs, doc_vecs) in vectors.items():
+        t = th.calibrate(query_vecs, doc_vecs, sets)
+        results[model] = th.evaluate(query_vecs, doc_vecs, data, sets, t)
+    settings = {"target_false_recall": th.TARGET_FALSE_RECALL, "sizes": list(th.SIZES),
+                "samples_per_size": th.SAMPLES_PER_SIZE, "seed": th.SEED}
+    root = bootstrap.project_root()
+    out = new_run_dir(root, "threshold_calibration")
+    write_json(out / "metrics.json", {"models": results})
+    write_json(out / "manifest.json", {
+        "run_id": out.name, "kind": "threshold_calibration", "source_run": source.name, "note": note,
+        "created": datetime.now().isoformat(timespec="seconds"), **corpus_info, **settings,
+        "positive_sets": sum(s.positive for s in sets), "negative_sets": sum(not s.positive for s in sets)})
+    if write:
+        config = {
+            "calibrated_on": source.name, "calibration_run": out.name, "corpus_sha256": corpus_info["corpus_sha256"],
+            "pool_labels_sha256": corpus_info.get("pool_labels_sha256"), **settings,
+            "thresholds": {m: r["threshold"] for m, r in results.items()},
+        }
+        header = "# Score thresholds per model (plan 5.1.8). Written by `memrag eval calibrate --write`;\n" \
+                 "# commit before evaluating the test set and do not edit by hand.\n"
+        (root / bootstrap.THRESHOLDS_CONFIG).write_text(
+            header + yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return {"run_dir": str(out), "written": write, **settings, "models": results}
+
+
+def evaluate_thresholds(run_dir: str, note: str = "") -> dict:
+    """Small-candidate metrics of a memory run with the fixed thresholds in configs/thresholds.yaml."""
+    import yaml
+
+    from memrag.application.evaluation import thresholds as th
+    from memrag.domain.errors import ConfigError
+    from memrag.infrastructure.storage.manifest import new_run_dir, write_json
+
+    root = bootstrap.project_root()
+    path = root / bootstrap.THRESHOLDS_CONFIG
+    if not path.is_file():
+        raise ConfigError(f"{path} not found; run `memrag eval calibrate <dev run> --write` first")
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    source, old, data, corpus_info, vectors = _load_run(run_dir)
+    if corpus_info.get("corpus_sha256") != config["corpus_sha256"]:
+        raise ConfigError("the thresholds were calibrated on another corpus")
+    sets = th.candidate_sets(data, config["sizes"], config["samples_per_size"], config["seed"])
+    results = {}
+    for model, (query_vecs, doc_vecs) in vectors.items():
+        if model not in config["thresholds"]:
+            raise ConfigError(f"no threshold for {model} in {path.name}")
+        results[model] = th.evaluate(query_vecs, doc_vecs, data, sets, config["thresholds"][model])
+    out = new_run_dir(root, "threshold_eval")
+    write_json(out / "metrics.json", {"models": results})
+    write_json(out / "manifest.json", {
+        "run_id": out.name, "kind": "threshold_eval", "source_run": source.name, "note": note,
+        "created": datetime.now().isoformat(timespec="seconds"), **corpus_info,
+        "thresholds_from": config["calibration_run"]})
+    return {"run_dir": str(out), "split": corpus_info["split"], "models": results}
+
+
+def rescore_retrieval(run_dir: str, note: str = "") -> dict:
+    """Score a finished evaluation again with the current labels, reusing its saved vectors.
+
+    No model is loaded, so it runs anywhere (also on Windows). Refuses when the corpus or
+    the queries changed since the run. Writes a new results/runs/<run_id>_retrieval_rescore/.
+    """
+    from memrag.application.evaluation.retrieval_eval import PRIMARY_SCOPE, rank
+    from memrag.infrastructure.storage.manifest import append_jsonl, new_run_dir, write_json
+
+    source, old, data, corpus_info, vectors = _load_run(run_dir)
+    out = new_run_dir(bootstrap.project_root(), "retrieval_rescore")
+    per_model = {}
+    for model, (query_vecs, doc_vecs) in vectors.items():
+        rows = rank(query_vecs, doc_vecs, data)
         for row in rows:
-            append_jsonl(out / "per_query.jsonl", {"model": path.stem, **row})
-        per_model[path.stem] = rows
+            append_jsonl(out / "per_query.jsonl", {"model": model, **row})
+        per_model[model] = rows
     metrics = _metrics(per_model)
     write_json(out / "metrics.json", metrics)
     write_json(out / "manifest.json", {

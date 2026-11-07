@@ -18,6 +18,9 @@
   --warn-soft: #f8ebd3;
   --crit: #a13626;
   --crit-soft: #f9e2dd;
+  --chart-1: #0b6972;
+  --chart-2: #b07a2a;
+  --chart-grid: #e1e8eb;
   --font-body: "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-ja: "IBM Plex Sans", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
   --font-mono: "IBM Plex Mono", "Noto Sans TC", Consolas, monospace;
@@ -36,6 +39,9 @@
     --warn-soft: #3a2c13;
     --crit: #f09382;
     --crit-soft: #40211b;
+    --chart-1: #62c6ce;
+    --chart-2: #e6b45f;
+    --chart-grid: #26353d;
     color-scheme: dark;
   }
 }
@@ -52,6 +58,9 @@
   --warn-soft: #3a2c13;
   --crit: #f09382;
   --crit-soft: #40211b;
+  --chart-1: #62c6ce;
+  --chart-2: #e6b45f;
+  --chart-grid: #26353d;
   color-scheme: dark;
 }
 
@@ -314,6 +323,11 @@ td.nowrap { white-space: nowrap; }
 .record-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .record-meta { font-family: var(--font-mono); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .record-block { display: grid; gap: 12px; }
+.chart { margin: 0; min-width: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 12px 14px; }
+.chart svg { display: block; width: 100%; max-width: 640px; height: auto; font-family: var(--font-body); }
+.chart .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); }
+.chart .chart-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--swatch); }
+.chart .table-caption { margin: 0; }
 .record-block > * { min-width: 0; }
 .table-caption { font-size: 14px; font-weight: 600; }
 .stat-row { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -753,6 +767,8 @@ uv run memrag summarize d_p01_1027 --show-retries # 總結一場對話，列出�
 uv run memrag corpus build                    # 總結全部對話並凍結到 data/02_memories（Nano，用 nano_llm_session.sh）
 uv run memrag eval run --models all --split dev --corpus memories # 檢索準確度（gold：事實原文；memories：LLM 記憶）
 uv run memrag eval rescore results/runs/&lt;run_id&gt; # 標註更新後，沿用存下的向量重算
+uv run memrag eval calibrate results/runs/&lt;dev run&gt; --write # 校準閾值，寫入 configs/thresholds.yaml
+uv run memrag eval thresholds results/runs/&lt;test run&gt; # 用固定閾值評估小候選集
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
 uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
@@ -1193,7 +1209,8 @@ ruri-v3-130m:
               <li><strong>LLM 記憶庫</strong>（5.1.4 的 641 筆，run_id <code>20261107-235108_retrieval_eval_memories</code>，池化後重算 <code>20261107-235741_retrieval_rescore</code>）：ruri-v3-310m 0.902、ruri-v3-130m 0.888、ruri-v3-30m 0.868、Qwen3 0.851、e5-small 0.751、bge-base-zh-v1.5 0.680</li>
               <li>兩種記憶庫的排名一致，前四名的信賴區間重疊；LLM 記憶庫上日期／類別過濾會擋掉 metadata 有誤的正確記憶，時間題約 0.6（Gold Facts 上是 1.0）</li>
               <li><strong>池化審查（2026-11-08 完成，開發集）：</strong>每題取 6 個模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶重新判斷，寫在 <code>data/02_memories/pool_labels.jsonl</code>；35 組調高、8 組調低</li>
-              <li>指標函式通過手算案例；與 <code>ranx</code> 的交叉驗證、閾值校準、小候選集、HNSW 與測試集評估還沒做</li>
+              <li><strong>閾值校準與小候選集（2026-11-08 完成，開發集）：</strong>每題抽 2–10 筆的候選集（正例含 1 筆 2 分記憶，負例全是 0 分；有答案題拿掉相關記憶也當負例，因為無答案題只有 8 題），校準無答案誤召回 ≤ 5% 的最低閾值，寫入 <code>configs/thresholds.yaml</code>（run_id <code>20261108-004204_threshold_calibration</code>）。正確記憶誤擋率：ruri-v3-130m 29%、ruri-v3-310m 32%、ruri-v3-30m 34%、Qwen3 35%、e5-small 48%、bge 61%；單靠閾值會擋掉約 3 成的正確記憶，5.1.6 要保留 LLM 判斷這一層</li>
+              <li>指標函式通過手算案例；與 <code>ranx</code> 的交叉驗證、HNSW 與測試集評估還沒做</li>
             </ul></dd></div>
         </dl>
       </article>
@@ -1410,25 +1427,83 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     "記憶變雜之後所有模型下降 0.03–0.12，表記差異題落差最大；ruri-v3-310m 最穩（0.956 → 0.902），Qwen3 退步最多（0.852 → 0.678）。",
     "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別只有 75%、日期 77% 正確，過濾會擋掉正確的記憶，時間題從標準事實的 1.0 掉到 0.6 左右。",
     "總結用 LLM：Nano 現有的 Qwen3-1.7B、Qwen3.5-2B 寫不出可用的日文；改用 Qwen3-4B-Instruct-2507，390 場對話全部總結成功，覆蓋 98% 的事實。",
+    "閾值：各模型校準到無答案誤召回 5% 時，小候選集的正確記憶誤擋率是 29%（ruri-v3-130m）到 61%（bge）。同一個使用者的記憶彼此相似，單靠分數閾值分不開，需要 LLM 判斷或 Reranker 當第二層。",
     "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
     "效能上 6 個模型在 Nano GPU 的單句延遲都在 84 ms 內，記憶體峰值都在 1.7 GiB 內；ruri-v3-30m 最快，ruri-v3-130m 的準確度接近 310m、延遲約一半。"
   ],
+  "charts": [
+    {
+      "kind": "chart",
+      "chart": "dot",
+      "caption": "準確度：nDCG@10（只搜本人，開發集 73 題，線段是 95% 信賴區間，越高越好）",
+      "categories": ["ruri-v3-310m", "ruri-v3-130m", "ruri-v3-30m", "Qwen3-Embedding-0.6B", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
+      "series": [
+        { "name": "LLM 總結的記憶庫（641 筆）", "values": [0.902, 0.888, 0.868, 0.851, 0.751, 0.680],
+          "ci": [[0.861, 0.939], [0.836, 0.932], [0.807, 0.919], [0.791, 0.903], [0.675, 0.822], [0.601, 0.752]] },
+        { "name": "標準事實記憶庫（400 筆）", "values": [0.945, 0.920, 0.931, 0.921, 0.871, 0.780],
+          "ci": [[0.912, 0.973], [0.881, 0.953], [0.889, 0.964], [0.880, 0.956], [0.815, 0.922], [0.712, 0.842]] }
+      ],
+      "min": 0.5, "max": 1.0,
+      "note": "橫軸從 0.5 開始。前四名的信賴區間重疊，差距不顯著；e5-small 與 bge 顯著較差。"
+    },
+    {
+      "kind": "chart",
+      "chart": "dot",
+      "caption": "表記差異題（漢字、平假名、簡稱）的 nDCG@10：記憶變雜之後的退步",
+      "categories": ["ruri-v3-310m", "ruri-v3-130m", "ruri-v3-30m", "Qwen3-Embedding-0.6B", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
+      "series": [
+        { "name": "LLM 總結的記憶庫", "values": [0.902, 0.877, 0.792, 0.678, 0.609, 0.577] },
+        { "name": "標準事實記憶庫", "values": [0.956, 0.963, 0.874, 0.852, 0.714, 0.664] }
+      ],
+      "min": 0.5, "max": 1.0,
+      "note": "每個模型只有 15 題左右，僅看趨勢。ruri-v3-310m 退步最少，Qwen3 退步最多。"
+    },
+    {
+      "kind": "chart",
+      "chart": "scatter",
+      "caption": "準確度與速度：nDCG@10（LLM 記憶庫）對 Nano GPU 單句延遲 p95",
+      "x": { "min": 0, "max": 100, "digits": 0, "label": "GPU 單句延遲 p95（ms），越左越快" },
+      "y": { "min": 0.6, "max": 0.95, "digits": 2, "label": "nDCG@10，越上越準" },
+      "legend": ["候選", "對照組（產品現用）"],
+      "points": [
+        { "label": "ruri-v3-310m", "x": 39.9, "y": 0.902, "dy": -6 },
+        { "label": "ruri-v3-130m", "x": 30.9, "y": 0.888, "dy": 14 },
+        { "label": "ruri-v3-30m", "x": 17.9, "y": 0.868, "dy": 14 },
+        { "label": "Qwen3-0.6B", "x": 83.6, "y": 0.851 },
+        { "label": "e5-small", "x": 19.8, "y": 0.751 },
+        { "label": "bge-base-zh", "x": 20.0, "y": 0.680, "group": 1 }
+      ],
+      "note": "延遲是 Nano 上的單次量測，只用來比較模型之間的差異；正式數字要在部署伺服器重測。"
+    },
+    {
+      "kind": "chart",
+      "chart": "bar",
+      "caption": "小候選集（2–10 筆）的正確記憶誤擋率：閾值設在無答案誤召回 5% 時（越低越好）",
+      "categories": ["ruri-v3-130m", "ruri-v3-310m", "ruri-v3-30m", "Qwen3-Embedding-0.6B", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
+      "series": [
+        { "name": "正確記憶誤擋率", "values": [0.294, 0.322, 0.338, 0.350, 0.479, 0.608],
+          "ci": [[0.200, 0.401], [0.222, 0.429], [0.233, 0.452], [0.243, 0.458], [0.371, 0.586], [0.494, 0.714]] }
+      ],
+      "min": 0, "max": 0.8, "digits": 2, "axisDigits": 1,
+      "note": "開發集、LLM 記憶庫；每個模型各自校準閾值。即使最好的模型也有約 3 成的正確記憶被擋，單靠閾值不夠。"
+    }
+  ],
   "comparison": {
     "caption": "模型比較總表（2026-11-08）",
-    "columns": ["模型", "角色", "nDCG@10（LLM 記憶庫）", "nDCG@10（標準事實）", "表記差異題（LLM 記憶庫）", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
-    "numeric": [2, 3, 4, 5, 6, 7, 8],
+    "columns": ["模型", "角色", "nDCG@10（LLM 記憶庫）", "nDCG@10（標準事實）", "表記差異題（LLM 記憶庫）", "小候選集誤擋率", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
+    "numeric": [2, 3, 4, 5, 6, 7, 8, 9],
     "rows": [
-      ["ruri-v3-310m", "候選", "0.902", "0.945", "0.902", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
-      ["ruri-v3-130m", "候選", "0.888", "0.920", "0.877", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
-      ["ruri-v3-30m", "候選", "0.868", "0.931", "0.792", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
-      ["Qwen3-Embedding-0.6B", "候選", "0.851", "0.921", "0.678", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
-      ["multilingual-e5-small", "候選", "0.751", "0.871", "0.609", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
-      ["bge-base-zh-v1.5", "對照組（產品現用）", "0.680", "0.780", "0.577", "—", "20.0 ms", "734 MiB", "104.6 ms"]
+      ["ruri-v3-310m", "候選", "0.902", "0.945", "0.902", "32%", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
+      ["ruri-v3-130m", "候選", "0.888", "0.920", "0.877", "29%", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
+      ["ruri-v3-30m", "候選", "0.868", "0.931", "0.792", "34%", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
+      ["Qwen3-Embedding-0.6B", "候選", "0.851", "0.921", "0.678", "35%", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
+      ["multilingual-e5-small", "候選", "0.751", "0.871", "0.609", "48%", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
+      ["bge-base-zh-v1.5", "對照組（產品現用）", "0.680", "0.780", "0.577", "61%", "—", "20.0 ms", "734 MiB", "104.6 ms"]
     ],
     "note": "準確度：開發集 73 題有答案的問題，只搜該使用者的記憶，精確搜尋，信賴區間約 ±0.04–0.05。「LLM 記憶庫」是 Qwen3-4B 總結 390 場模擬對話得到的 641 筆記憶，經池化審查補判；「標準事實」是 400 筆事實原文。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "5.1.8：閾值校準與小候選集（2–10 筆）誤擋率；最後用測試集 120 題做正式評估。",
+    "5.1.8：閾值已寫入 configs/thresholds.yaml 並提交；接著凍結選型權重（selection.yaml），再用測試集 120 題做正式評估。",
     "5.1.6：決定 metadata 可能出錯時，日期／類別過濾要怎麼用。"
   ],
   "tasks": [
@@ -1439,7 +1514,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（評估目前用精確搜尋）" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
-    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "進行中：開發集在兩種記憶庫的結果；閾值與測試集未做" },
+    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "進行中：開發集在兩種記憶庫的結果與閾值校準完成；測試集未做" },
     { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "尚未開始" }
   ]
 }
@@ -1851,6 +1926,32 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   ],
   "results": [
     {
+      "kind": "chart",
+      "chart": "dot",
+      "caption": "nDCG@10（只搜本人，線段是 95% 信賴區間）",
+      "categories": ["ruri-v3-310m", "ruri-v3-130m", "ruri-v3-30m", "qwen3-emb-0.6b", "e5-small", "bge-base-zh-v1.5（對照組）"],
+      "series": [
+        { "name": "LLM 總結的記憶庫", "values": [0.902, 0.888, 0.868, 0.851, 0.751, 0.680],
+          "ci": [[0.861, 0.939], [0.836, 0.932], [0.807, 0.919], [0.791, 0.903], [0.675, 0.822], [0.601, 0.752]] },
+        { "name": "標準事實記憶庫", "values": [0.945, 0.920, 0.931, 0.921, 0.871, 0.780],
+          "ci": [[0.912, 0.973], [0.881, 0.953], [0.889, 0.964], [0.880, 0.956], [0.815, 0.922], [0.712, 0.842]] }
+      ],
+      "min": 0.5, "max": 1.0,
+      "note": "橫軸從 0.5 開始。"
+    },
+    {
+      "kind": "chart",
+      "chart": "bar",
+      "caption": "時間／類別題的 nDCG@10：日期／類別過濾在 LLM 記憶庫上的效果",
+      "categories": ["ruri-v3-310m", "ruri-v3-130m", "ruri-v3-30m", "qwen3-emb-0.6b", "e5-small", "bge-base-zh-v1.5（對照組）"],
+      "series": [
+        { "name": "只搜本人", "values": [0.735, 0.610, 0.601, 0.698, 0.353, 0.281] },
+        { "name": "本人＋日期／類別過濾", "values": [0.570, 0.573, 0.588, 0.597, 0.557, 0.525] }
+      ],
+      "min": 0, "max": 1.0, "digits": 2, "axisDigits": 1,
+      "note": "開發集的時間／類別題約 10 題。標準事實記憶庫上，套過濾後 6 個模型都是 1.0；這裡因為 LLM 抽的類別與日期有誤，過濾會擋掉正確記憶，好模型反而變差。"
+    },
+    {
       "kind": "table",
       "caption": "只搜本人：nDCG@10（池化後）與和標準事實記憶庫的比較",
       "columns": ["模型", "記憶庫 nDCG@10", "95% 信賴區間", "Recall@5", "與最佳的差距", "標準事實記憶庫"],
@@ -1921,6 +2022,84 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   "related": [
     { "id": "2026-11-07_retrieval-eval-gold-dev", "relation": "同一批題目在標準事實記憶庫上的結果" },
     { "id": "2026-11-07_summarizer-llm-corpus", "relation": "這次使用的記憶語料" }
+  ]
+}
+},{"id":"2026-11-08_threshold-calibration-dev","record":{
+  "title": "閾值校準與小候選集誤擋率（開發集）",
+  "date": "2026-11-08",
+  "task": "5.1.8",
+  "type": "指標評估",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "使用者的記憶只有幾筆、問題又跟每一筆都無關時，模型能不能靠分數閾值不送出記憶？閾值設在不亂送（誤召回 ≤ 5%）的程度時，會擋掉多少正確的記憶？",
+  "environment": [
+    "Windows，沿用 20261107-235108_retrieval_eval_memories 存下的向量，不載入模型；run_id 20261108-004204_threshold_calibration",
+    "語料 data/02_memories（sha256 2bd13bef…）與池化標註 pool_labels.jsonl",
+    "閾值寫入 configs/thresholds.yaml，評估測試集前提交",
+    "git commit：N/A（尚未提交）"
+  ],
+  "method": [
+    "uv run memrag eval calibrate results/runs/20261107-235108_retrieval_eval_memories --write",
+    "每題從該使用者的記憶抽 2–10 筆的候選集，每種大小抽 10 次：正例含 1 筆直接回答的記憶（2 分）加上無關的記憶，負例全是無關的記憶（0 分）；1 分的記憶不抽",
+    "負例也來自有答案的題目（拿掉相關記憶），代表「答案不在記憶庫」；開發集只有 8 題無答案題，不夠校準",
+    "每個模型取讓負例誤召回率 ≤ 5% 的最低閾值（無條件進位到小數 4 位）",
+    "正例 6,300 組、負例 7,290 組；信賴區間以題目為單位做 Bootstrap"
+  ],
+  "results": [
+    {
+      "kind": "chart",
+      "chart": "bar",
+      "caption": "正確記憶誤擋率（越低越好，線段是 95% 信賴區間）",
+      "categories": ["ruri-v3-130m", "ruri-v3-310m", "ruri-v3-30m", "qwen3-emb-0.6b", "e5-small", "bge-base-zh-v1.5（對照組）"],
+      "series": [
+        { "name": "正確記憶誤擋率", "values": [0.294, 0.322, 0.338, 0.350, 0.479, 0.608],
+          "ci": [[0.200, 0.401], [0.222, 0.429], [0.233, 0.452], [0.243, 0.458], [0.371, 0.586], [0.494, 0.714]] }
+      ],
+      "min": 0, "max": 0.8, "digits": 2, "axisDigits": 1
+    },
+    {
+      "kind": "table",
+      "caption": "各模型的閾值與小候選集指標",
+      "columns": ["模型", "閾值（cosine）", "無答案誤召回", "正確記憶誤擋", "錯誤記憶通過率", "Top-1 錯誤率"],
+      "numeric": [1, 2, 3, 4, 5],
+      "rows": [
+        ["ruri-v3-130m", "0.849", "5.0%", "29.4%", "13.9%", "7.0%"],
+        ["ruri-v3-310m", "0.862", "4.8%", "32.2%", "14.9%", "4.9%"],
+        ["ruri-v3-30m", "0.863", "4.8%", "33.8%", "13.8%", "9.3%"],
+        ["qwen3-emb-0.6b", "0.455", "5.0%", "35.0%", "14.1%", "8.4%"],
+        ["e5-small", "0.844", "5.0%", "47.9%", "17.8%", "19.1%"],
+        ["bge-base-zh-v1.5（對照組）", "0.581", "4.9%", "60.8%", "22.9%", "25.5%"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "無答案誤召回率在開發集都校準到 5% 以下，95% 信賴區間下限約 2%–3%；計畫的硬性門檻（測試集的信賴區間下限 ≤ 5%）要等測試集確認。",
+        "誤擋率和候選集大小幾乎無關（2 筆 vs 10 筆差不到 1 個百分點），因為「答案有沒有被擋」只取決於那一筆答案的分數。",
+        "Top-1 錯誤率（最高分不是答案）：ruri-v3-310m 最低（4.9%），bge 最高（25.5%）。",
+        "四個主要候選的誤擋率都在 29%–35%，信賴區間重疊，分不出高下；e5-small 和 bge 明顯較差。"
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "解讀與限制",
+      "text": "同一個使用者的記憶常常主題相近（例如都是健康或家人），不相關卻高分的記憶很多，所以要壓低誤召回就得把閾值拉高，也就擋掉約 3 成的正確記憶。這符合計畫的風險預估：閾值只能當第一層，第二層靠 LLM 判斷記憶有沒有回答問題，必要時下一輪評估 Reranker。候選集是隨機抽樣的模擬情境；池化只涵蓋各模型前 5 名，少數沒判斷過的記憶可能其實相關，會讓誤召回略為高估。"
+    }
+  ],
+  "conclusion": [
+    "各模型的閾值已校準並寫入 configs/thresholds.yaml，測試集只能用這組固定閾值。",
+    "小候選集誤擋率（選型權重 20%）：ruri-v3-130m 29% 最好，ruri-v3-310m 32%、ruri-v3-30m 34%、Qwen3 35% 相近；e5-small 48%、bge 61% 明顯較差。",
+    "單靠分數閾值會擋掉約 3 成的正確記憶，5.1.6 的流程要保留「LLM 判斷」這一層。"
+  ],
+  "next": [
+    "凍結 selection.yaml（硬性門檻與權重），再用測試集 120 題做正式評估。"
+  ],
+  "sources": [
+    { "text": "results/runs/20261108-004204_threshold_calibration/" },
+    { "text": "configs/thresholds.yaml" }
+  ],
+  "related": [
+    { "id": "2026-11-08_retrieval-eval-memories-dev", "relation": "同一批向量與記憶庫的排序指標" }
   ]
 }
 }]}</script>
@@ -1997,7 +2176,111 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     return wrap;
   }
 
+  // Inline SVG charts: block = {kind: 'chart', chart: 'dot' | 'bar' | 'scatter', caption, categories,
+  // series: [{name, values, ci?, labels?}], min, max, digits, axis, note}. Colours come from CSS tokens.
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var SERIES_COLORS = ['var(--chart-1)', 'var(--chart-2)'];
+
+  function svgEl(name, attrs, text) {
+    var node = document.createElementNS(SVGNS, name);
+    Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function ticks(min, max) {
+    var step = (max - min) / 5;
+    var out = [];
+    for (var i = 0; i <= 5; i++) out.push(min + step * i);
+    return out;
+  }
+
+  function fmt(value, digits) { return Number(value).toFixed(digits === undefined ? 3 : digits); }
+
+  // One row per category: the label on its own line, then one dot (with CI) or bar per series.
+  function rowChart(b) {
+    var W = 400, left = 14, plotW = 312, labelH = 16, lineH = 16, gap = 10;
+    var series = b.series, rowH = labelH + series.length * lineH + gap;
+    var height = 6 + b.categories.length * rowH + 22;
+    var min = b.min === undefined ? 0 : b.min, max = b.max === undefined ? 1 : b.max;
+    var x = function (v) { return left + (Math.max(min, Math.min(max, v)) - min) / (max - min) * plotW; };
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + height, role: 'img', 'aria-label': b.caption || '' });
+    var bottom = height - 20;
+    ticks(min, max).forEach(function (t) {
+      svg.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 4, y2: bottom, stroke: 'var(--chart-grid)', 'stroke-width': 1 }));
+      svg.appendChild(svgEl('text', { x: x(t), y: bottom + 14, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, fmt(t, b.axisDigits === undefined ? 2 : b.axisDigits)));
+    });
+    b.categories.forEach(function (category, i) {
+      var y0 = 6 + i * rowH;
+      svg.appendChild(svgEl('text', { x: left, y: y0 + 12, 'font-size': 13, fill: 'var(--fg)', 'font-weight': 600 }, category));
+      series.forEach(function (s, k) {
+        var cy = y0 + labelH + k * lineH + lineH / 2;
+        var v = s.values[i], color = SERIES_COLORS[k % SERIES_COLORS.length];
+        if (v === null || v === undefined) return;
+        if (b.chart === 'bar') {
+          svg.appendChild(svgEl('rect', { x: x(min), y: cy - 5, width: Math.max(1, x(v) - x(min)), height: 10, rx: 2, fill: color }));
+        }
+        if (s.ci && s.ci[i]) {
+          svg.appendChild(svgEl('line', { x1: x(s.ci[i][0]), x2: x(s.ci[i][1]), y1: cy, y2: cy, stroke: color, 'stroke-width': 2, 'stroke-opacity': b.chart === 'bar' ? 0.55 : 0.8 }));
+          [0, 1].forEach(function (j) {
+            svg.appendChild(svgEl('line', { x1: x(s.ci[i][j]), x2: x(s.ci[i][j]), y1: cy - 4, y2: cy + 4, stroke: color, 'stroke-width': 1.5 }));
+          });
+        }
+        if (b.chart !== 'bar') svg.appendChild(svgEl('circle', { cx: x(v), cy: cy, r: 4.5, fill: color }));
+        var labelX = Math.max(x(v), s.ci && s.ci[i] ? x(s.ci[i][1]) : x(v)) + 7;
+        svg.appendChild(svgEl('text', { x: labelX, y: cy + 4, 'font-size': 11.5, fill: 'var(--muted)' }, fmt(v, b.digits) + (b.unit || '')));
+      });
+    });
+    if (b.axis) svg.appendChild(svgEl('text', { x: left + plotW, y: height - 1, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, b.axis));
+    return svg;
+  }
+
+  function scatterChart(b) {
+    var W = 400, H = 280, l = 44, r = 16, t = 12, bt = 40;
+    var xr = b.x, yr = b.y;
+    var px = function (v) { return l + (v - xr.min) / (xr.max - xr.min) * (W - l - r); };
+    var py = function (v) { return H - bt - (v - yr.min) / (yr.max - yr.min) * (H - t - bt); };
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': b.caption || '' });
+    ticks(xr.min, xr.max).forEach(function (v) {
+      svg.appendChild(svgEl('line', { x1: px(v), x2: px(v), y1: t, y2: H - bt, stroke: 'var(--chart-grid)' }));
+      svg.appendChild(svgEl('text', { x: px(v), y: H - bt + 14, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, fmt(v, xr.digits)));
+    });
+    ticks(yr.min, yr.max).forEach(function (v) {
+      svg.appendChild(svgEl('line', { x1: l, x2: W - r, y1: py(v), y2: py(v), stroke: 'var(--chart-grid)' }));
+      svg.appendChild(svgEl('text', { x: l - 6, y: py(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, fmt(v, yr.digits)));
+    });
+    svg.appendChild(svgEl('text', { x: (l + W - r) / 2, y: H - 6, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)' }, xr.label));
+    svg.appendChild(svgEl('text', { x: 12, y: (t + H - bt) / 2, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)', transform: 'rotate(-90 12 ' + (t + H - bt) / 2 + ')' }, yr.label));
+    b.points.forEach(function (p) {
+      var color = SERIES_COLORS[p.group || 0];
+      svg.appendChild(svgEl('circle', { cx: px(p.x), cy: py(p.y), r: 5, fill: color }));
+      var anchor = px(p.x) > W - 110 ? 'end' : 'start';
+      var dx = anchor === 'end' ? -8 : 8;
+      svg.appendChild(svgEl('text', { x: px(p.x) + dx, y: py(p.y) + (p.dy || 4), 'text-anchor': anchor, 'font-size': 11.5, fill: 'var(--fg)' }, p.label));
+    });
+    return svg;
+  }
+
+  function chart(b) {
+    var wrap = el('figure', 'record-block chart');
+    if (b.caption) wrap.appendChild(el('figcaption', 'table-caption', b.caption));
+    wrap.appendChild(b.chart === 'scatter' ? scatterChart(b) : rowChart(b));
+    var names = b.chart === 'scatter' ? (b.legend || []) : b.series.map(function (s) { return s.name; });
+    if (names.length > 1 || (b.chart === 'scatter' && names.length)) {
+      var legend = el('div', 'chart-legend');
+      names.forEach(function (name, k) {
+        var item = el('span', '', name);
+        item.style.setProperty('--swatch', SERIES_COLORS[k % SERIES_COLORS.length]);
+        legend.appendChild(item);
+      });
+      wrap.appendChild(legend);
+    }
+    if (b.note) wrap.appendChild(el('p', 'record-meta', b.note));
+    return wrap;
+  }
+
   function block(item) {
+    if (item.kind === 'chart') return chart(item);
     if (item.kind === 'table') return table(item);
     if (item.kind === 'list') return list(item.items);
     if (item.kind === 'note') {
@@ -2068,6 +2351,10 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     root.appendChild(note);
     root.appendChild(section('目前選型結論', [el('p', '', data.overview.conclusion)]));
     root.appendChild(section('本期重點', [list(data.overview.findings)]));
+
+    if (data.overview.charts && data.overview.charts.length) {
+      root.appendChild(section('重點比較圖', data.overview.charts.map(chart)));
+    }
 
     var comparison = data.overview.comparison;
     var compareNodes = [table(comparison)];
