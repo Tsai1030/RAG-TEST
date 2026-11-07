@@ -9,12 +9,14 @@ from memrag.domain.schemas.embedding import EncodedText, ModelSpec, TextKind
 
 
 class SentenceTransformerProvider:
-    def __init__(self, spec: ModelSpec, model_path: Path, device: str = "cuda", batch_size: int = 32):
+    def __init__(self, spec: ModelSpec, model_path: Path, device: str = "cuda", batch_size: int = 32,
+                 dtype: str | None = None):
         import torch
         from sentence_transformers import SentenceTransformer
 
+        # `dtype` overrides the registry (metric tests use float32 for every model).
         # CPU always float32: the Nano's Cortex-A78AE has no bf16 instructions
-        dtype = getattr(torch, spec.dtype) if device.startswith("cuda") else torch.float32
+        dtype = getattr(torch, dtype or spec.dtype) if device.startswith("cuda") else torch.float32
         self._spec = spec
         self._batch_size = batch_size
         self.model = SentenceTransformer(

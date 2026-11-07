@@ -32,6 +32,7 @@ uv run memrag embed "テスト" --model ruri-v3-30m --explain --fake  # 不載�
 | `.gitignore` | 檔案 | 不進版控的檔案規則 | 手動維護 | 是 |
 | `.gitattributes` | 檔案 | 讓 `.sh` 腳本在 Windows 上也保持 LF 換行，同步到 Nano 才能執行 | 手動維護 | 是 |
 | `configs/` | 資料夾 | 設定檔，說明見 [`configs/README.md`](configs/README.md) | — | 是 |
+| `data/` | 資料夾 | 評估用的模擬資料與標準答案，說明見 [`data/README.md`](data/README.md) | — | 是 |
 | `docs/` | 資料夾 | 專案文件，說明見 [`docs/README.md`](docs/README.md) | — | 是 |
 | `prompts/` | 資料夾 | 所有 LLM prompt，說明見 [`prompts/README.md`](prompts/README.md) | — | 是 |
 | `reports/` | 資料夾 | 測試與模型調查的紀錄，說明見 [`reports/README.md`](reports/README.md) | — | 是 |

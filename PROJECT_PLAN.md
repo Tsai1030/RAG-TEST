@@ -2,8 +2,8 @@
 
 | 項目 | 內容 |
 |---|---|
-| 版本 / 日期 | v0.11（草案）/ 2026-11-07 |
-| 執行平台 | NVIDIA Jetson Orin Nano Super（GPU）；Windows 筆電僅用於開發與遠端操作 |
+| 版本 / 日期 | v0.14（草案）/ 2026-11-07 |
+| 執行平台 | 開發與測試：NVIDIA Jetson Orin Nano Super（GPU）；Windows 筆電僅用於開發與遠端操作。正式部署：自架伺服器（預計在 AWS），不使用外部 API（D2） |
 | 最終交付 | Embedding 模型選型決策、可重現的完整 RAG pipeline、Python Library 與手動測試介面、測試結果網頁 |
 | 估計工時 | 約 21.5 人天（估計值，開始日期待定） |
 | Python 套件名稱 | `memrag`（暫定） |
@@ -19,7 +19,7 @@
 - 候選模型調查、篩選與 CPU 載入驗證
 - 記憶 Schema、測試 Query 與 Ground Truth（只做日文）
 - 假對話 Log 生成與摘要（結構化輸出、驗證、重試）
-- 向量資料庫與過濾檢索（`person_id` / `date` / `type`）
+- 向量資料庫與過濾檢索（`person_id` / `date` / `category`）
 - 完整 RAG 串接：Log → Summarize → Embed → Store → Retrieve → LLM Answer
 - 各階段延遲與記憶體量測、模型指標測試、結果分析與選型
 - 分層專案結構、Library、CLI、手動測試 UI、測試結果網頁
@@ -59,19 +59,22 @@
 
 ### 2.2 需要確認的決策
 
-未回覆時依「預設」進行，所有預設都可透過設定檔切換。**已確認：** 向量庫先用 ChromaDB（見 5.1.5）；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 `~/50019/rag_test`；Windows 專案資料全部同步到 Nano（見 2.3）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 `bge-base-zh-v1.5` 加入當對照組（見 5.1.1）。
+未回覆時依「預設」進行，所有預設都可透過設定檔切換。**已確認：** 向量庫先用 ChromaDB（見 5.1.5）；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 `~/50019/rag_test`；Windows 專案資料全部同步到 Nano（見 2.3）；正式部署在自架伺服器，不用外部 API（D2）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 `bge-base-zh-v1.5` 加入當對照組（見 5.1.1）。
 
 | # | 問題 | 預設 | 影響 |
 |---|---|---|---|
 | D1 | GPU 記憶體數據這樣呈現可以嗎？ | Nano 沒有獨立 VRAM，改報 PyTorch GPU 配置峰值與系統記憶體增量 | 原排程的 VRAM 欄位將採用這個定義 |
-| D2 | 最終部署硬體也是這台 Nano 嗎？ | 是，選型門檻以 Nano 為準 | 若部署到其他硬體，效能部分要重測 |
+| D2 | 最終部署硬體也是這台 Nano 嗎？ | **已確認不是（2026-11-07）。** 正式部署在自架伺服器（預計在 AWS），自行執行開源模型，不使用外部 API | 檢索品質的結果直接適用。Nano 改為開發與測試平台，它的延遲與記憶體數字只作模型間的相對比較；正式數字要在部署伺服器重測。硬性門檻與權重已依此調整（見 5.1.9） |
 | D3 | 系統是否會商用？ | **已確認會商用（2026-11-07）** | 非商用授權的模型不可入選；Sarashina 因此排除 |
-| D4 | 生成與摘要使用哪個 LLM？ | Nano 上以 llama.cpp 跑 `Qwen3-1.7B-Q4_K_M`（這台已有常駐服務以 `-ngl 99` 載入此模型）；假對話量大，先測速度，不夠快才改雲端 API；測試用 Replay | 日文摘要品質與速度都還沒驗證，於 5.1.4 實測 |
+| D4 | 生成與摘要使用哪個 LLM？ | Nano 上以 llama.cpp 跑 `Qwen3-1.7B-Q4_K_M`（這台已有常駐服務以 `-ngl 99` 載入此模型）；假對話量大，先測速度，不夠快才改雲端 API；測試用 Replay | 日文摘要品質與速度都還沒驗證，於 5.1.4 實測。正式環境的當日對話總結也是自架 LLM（D2）；測試語料最好用與正式環境相近的模型產生，否則記憶的寫法會和上線時不同 |
 | D5 | 回答階段的 LLM 為何？ | 與 D4 相同 | 影響 5.1.7 的 LLM 延遲是否有代表性 |
 | D6 | 除日文外還要測哪些語言？ | **已確認只做日文（2026-11-07）** | 不製作其他語言與跨語言資料；多語模型仍可當候選，但只評估日文表現 |
 | D7 | 誰負責第二位標註與日文審閱？ | **已確認由 Claude 負責（2026-11-07）**，做法見 5.1.3 | 不是人類母語者審閱，這項限制要寫進選型報告 |
 | D8 | 常駐的 `llama-server`（:8090）與 `pocket_tts_server`（:8092）量測時可以暫停嗎？ | **已確認可以暫停。** 只在量測時停止，結束後重啟 | 暫停後估計可用約 6.5 GiB。`SIGSTOP` 不會釋放記憶體，所以實際做法是結束行程，再依各服務的 README 重啟 |
 | D9 | 磁碟只剩 8.7 GB，怎麼處理？ | **已完成（2026-11-07）。** 刪除明確無人使用的 LM Studio Gemma 4 E4B GGUF（約 5.9 GiB）；其他模型都有程式引用或屬於其他專案，不刪 | 目前剩 15 GB。候選模型總大小仍限制在約 4 GB；加入對照組時預估約 4.2 GiB，使用者已同意（2026-11-07）；5.1.2 移出 GLuCoSE 後，首輪 6 個模型實際下載約 3.8 GiB。5.1.1 查到實際權重：Sarashina 約 4.6 GiB，超過 3 GiB 記憶體門檻；PLaMo 約 2.0 GiB，原本估計的 4 GB 有誤，改列備選 |
+| D10 | 部署伺服器的規格？（有沒有 NVIDIA GPU、記憶體多大） | **已確認（2026-11-07）：本輪只用 Nano 測試。** 目的是找出日文最好的 Embedding 模型，伺服器規格之後再定 | 延遲與記憶體門檻沿用 Nano 的數字；選型以檢索品質為主 |
+| D11 | 因 Nano 記憶體而沒列入的較大模型（`Nemotron-3-Embed-1B`、`PLaMo-Embedding-1B`）要加回嗎？ | **已確認先不加（2026-11-07）** | 首輪維持 5 個候選加 1 個對照組 |
+| D12 | 記憶 JSON 要抽哪些事件欄位與 metadata？ | **已確認（2026-11-07）：** 陪伴機器人與使用者的當日對話，用模擬資料；欄位採 Claude 建議的 6 個必要欄位加 `people`，見 5.1.3 | 測試語料的 Schema 與寫法應和正式環境一致；只有 `content` 會被向量化，所以影響最大的是 `content` 的寫法與分類方式；metadata 決定能用哪些條件過濾 |
 
 ### 2.3 開發與執行流程
 
@@ -199,12 +202,12 @@ RAG TEST/
 │   │   ├── schemas/
 │   │   │   ├── embedding.py      # ModelSpec, EncodedText, prefix 規則
 │   │   │   ├── dialogue.py       # DialogueLog, Turn
-│   │   │   ├── memory.py         # MemoryDraft（LLM 輸出）, MemoryRecord, MemoryType
+│   │   │   ├── memory.py         # MemoryDraft（LLM 輸出）, MemoryRecord, Category
 │   │   │   ├── retrieval.py      # MemoryFilter, SearchHit, Answer
-│   │   │   └── evaluation.py     # GoldFact, TestQuery, Qrel, RunManifest
+│   │   │   └── evaluation.py     # Persona, GoldFact, TestQuery, QueryLabel
 │   │   ├── metrics/
 │   │   │   ├── retrieval.py      # Recall@k, MRR, nDCG
-│   │   │   └── statistics.py     # bootstrap 信賴區間
+│   │   │   └── statistics.py     # Cohen's κ、bootstrap 信賴區間、AUC
 │   │   ├── ports.py              # Port 介面定義
 │   │   └── errors.py             # 領域錯誤類別
 │   │
@@ -217,6 +220,8 @@ RAG TEST/
 │   │   ├── answer.py             # 依檢索結果產生回答與引用
 │   │   ├── pipeline.py           # 串接全流程
 │   │   └── evaluation/
+│   │       ├── dataset_check.py  # 標準答案檢查、切分、抽樣、標註一致度
+│   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：三種過濾範圍、逐題指標、配對比較
 │   │       ├── qrels.py          # 編譯 Qrels
 │   │       ├── metric_runner.py  # 模型 × 設定 測試矩陣
 │   │       ├── profile_runner.py # 各階段延遲與記憶體量測
@@ -273,7 +278,7 @@ RAG TEST/
 │   └── fixtures/                 # 小型日文樣本、LLM 錄製回應
 │
 ├── data/                         # 依流程階段編號
-│   ├── 00_gold/                  # gold_facts.jsonl, queries.jsonl, labels.jsonl
+│   ├── 00_gold/                  # personas, gold_facts, queries, labels（兩次標註）、抽樣清單
 │   ├── 01_dialogues/             # 假對話 Log
 │   ├── 02_memories/              # 凍結的記憶語料
 │   ├── 03_qrels/                 # 編譯後的相關性標註、小候選集定義
@@ -287,14 +292,16 @@ RAG TEST/
 │   └── metrics.json / per_query.jsonl # 整體與單筆 Query 指標
 │
 ├── reports/
-│   ├── overview.json             # 分頁「總覽」的目前結論與任務進度
-│   └── records/                  # 每次測試與模型調查的紀錄，一次一檔（進版控）
+│   ├── overview.json             # 分頁「總覽」：結論、本期重點、模型比較總表、任務進度
+│   ├── log/                      # 2026-11-07 以前的過程紀錄存檔，不放上網頁
+│   └── records/                  # 實驗結果，一次實驗一檔（進版控）
 │       └── <日期>_<主題>.json     # 網頁下拉選單的一個項目
 │
 ├── docs/
 │   ├── survey/                   # 5.1.1：model_survey.md、mteb_japanese_retrieval.json
 │   ├── schema/memory_schema.md   # 5.1.3
 │   ├── annotation_guide.md       # 5.1.3
+│   ├── annotation_review.md      # 5.1.3：兩次標註的分歧裁決與日文審閱紀錄
 │   ├── manual_testing.md         # 手動測試手冊
 │   ├── project_plan.html         # 計畫書網頁的原始檔，含測試結果分頁
 │   ├── analysis/selection_report.md  # 5.1.9
@@ -347,7 +354,7 @@ print(report.accepted, report.rejected, report.retries)
 # 過濾檢索
 hits = rag.search(
     "田中さんの好きな食べ物は？",
-    filters=MemoryFilter(person_id="p001", type="preference", date_from="2026-01-01"),
+    filters=MemoryFilter(person_id="p001", category="preference", date_from="2026-01-01"),
     top_k=5,
 )
 
@@ -371,9 +378,13 @@ uv run memrag models probe --devices cuda,cpu # 每個模型在獨立子行程�
 uv run memrag prompt list                     # 所有 prompt 與版本
 uv run memrag prompt show summarize --version v1 # 查看 prompt 內容與 hash
 uv run memrag embed "こんにちは" --model ruri-v3-130m --kind query --explain
+uv run memrag dataset validate                # 標準答案的格式與一致性檢查、統計
+uv run memrag dataset show-query q_p01_05     # 查看一題與它的相關事實
+uv run memrag dataset agreement               # 兩次標註的 Cohen's κ
+uv run memrag eval run --models all --split dev # 檢索準確度（目前以 Gold Facts 當記憶庫，精確搜尋）
 uv run memrag summarize tests/fixtures/dialogue_ja_001.json --json
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
-uv run memrag search "好きな食べ物" --person p001 --type preference --from 2026-01-01 -k 5
+uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
 uv run memrag profile --config configs/experiments/smoke.yaml
 uv run memrag eval --config configs/experiments/full_metric.yaml
@@ -396,7 +407,7 @@ ssh -L 7860:127.0.0.1:7860 robo@172.28.0.147
 |---|---|
 | Embedding | 輸入文字、選模型與 kind，查看 prefix、維度、耗時，比較兩句相似度 |
 | Summarize | 貼上對話 Log，查看 LLM 原始輸出、驗證錯誤、重試過程、最終記憶 |
-| Search | 設定 `person_id` / `date` / `type` / `top_k`，查看分數、是否通過閾值與 metadata |
+| Search | 設定 `person_id` / `date` / `category` / `top_k`，查看分數、是否通過閾值與 metadata |
 | Compare | 同一 Query 並排比較多個模型的檢索結果 |
 | Ask | 完整問答，顯示通過閾值的記憶、Context、引用與各階段耗時 |
 | Feedback | 把手動發現的問題 Query 存成候選，**審閱後**才可加入 Query 集 |
@@ -409,7 +420,7 @@ ssh -L 7860:127.0.0.1:7860 robo@172.28.0.147
 
 ## 7. 各任務工作內容
 
-每項任務都要同時交付：功能程式、Library/CLI 入口、測試、手冊章節、測試結果分頁的紀錄，以及所有變動資料夾的 README。
+每項任務都要同時交付：功能程式、Library/CLI 入口、測試、手冊章節、所有變動資料夾的 README；有實驗結果的任務，還要把結果放上測試結果分頁（見第 9 節）。
 
 ### 5.1.1 Candidate Embedding Model Survey
 
@@ -507,22 +518,37 @@ ruri-v3-130m:
 
 ### 5.1.3 Memory Schema, Query Set & Ground Truth
 
-**記憶 Schema（Pydantic，附 `schema_version`）**
+**情境（D12，2026-11-07 確認）：** 陪伴機器人每天把和使用者的對話總結成幾筆記憶，存進向量庫；之後使用者說話時，機器人依這句話找出相關記憶。全部用模擬資料。
+
+**記憶 Schema（Pydantic，附 `schema_version`，詳見 `docs/schema/memory_schema.md`）**
 
 | 欄位 | 型別 | 來源 | 說明 |
 |---|---|---|---|
-| `person_id` | str | LLM | 必填，用於過濾 |
-| `type` | enum | LLM | `fact` / `preference` / `event` / `relationship` / `plan` |
-| `content` | str | LLM | 被向量化的日文記憶文字 |
-| `event_date` | date \| null | LLM | 事件日期（ISO 8601） |
-| `source_turn_ids` | list[int] | LLM | 證據對話輪次 |
+| `category` | enum | LLM | 8 類，見下表；可用來過濾 |
+| `content` | str | LLM | 1–2 句日文記憶，**唯一被向量化的欄位** |
+| `event_date` | date \| null | LLM | 事件發生或預定的日期（ISO 8601），可用日期範圍過濾 |
+| `people` | list[str] | LLM | 記憶中提到的人，例如 `["孫の結衣"]`；沒有就是空清單 |
+| `source_turn_ids` | list[int] | LLM | 證據對話輪次，用來檢查摘要有沒有亂編 |
+| `person_id` | str | 程式 | 對話的使用者；機器人一定知道在跟誰說話，所以由程式依對話 Log 填入，不讓 LLM 判斷 |
+| `conversation_date` | date | 程式 | 這筆記憶來自哪一天的對話 |
 | `memory_id` | str | 程式 | 依內容產生的穩定 ID |
 | `event_date_ord` | int \| null | 程式 | `YYYYMMDD` 整數，供範圍過濾 |
 | `source_log_id` | str | 程式 | 來源對話 |
 | `schema_version` | str | 程式 | Schema 版本 |
 | `gold_fact_ids` | list[str] | 評估資料 | 僅評估時使用，不給 LLM 看 |
 
-LLM 只輸出前 5 個欄位（`MemoryDraft`），其餘由程式補上。這輪 Schema 是固定條件，不比較不同格式。
+| `category` | 日文 | 內容 |
+|---|---|---|
+| `event` | 出来事 | 當天或過去發生的事 |
+| `plan` | 予定 | 未來的安排 |
+| `preference` | 好み | 喜歡或討厭的東西 |
+| `relationship` | 人間関係 | 家人、朋友、寵物 |
+| `health` | 健康・体調 | 身體狀況、睡眠、服藥 |
+| `emotion` | 気持ち | 情緒、擔心的事 |
+| `routine` | 習慣 | 日常作息 |
+| `profile` | プロフィール | 住處、職業、出身等基本資料 |
+
+LLM 只輸出前 5 個欄位（`MemoryDraft`），其餘由程式補上。`importance`、`emotion` 這類選用 metadata 本輪不做。這輪 Schema 是固定條件，不比較不同格式。
 
 **Query 集（目標 150–200 筆，全部日文）**
 
@@ -532,7 +558,7 @@ LLM 只輸出前 5 個欄位（`MemoryDraft`），其餘由程式補上。這輪
 | 改寫／同義 | 20% | 語意能力 |
 | 日文表記與語體 | 20% | 漢字／假名、敬語／口語、縮寫 |
 | 人物限定 | 15% | 相似內容屬於不同人 |
-| 時間與類型限定 | 15% | 日期與 type 過濾 |
+| 時間與類型限定 | 15% | 日期與 category 過濾 |
 | 無答案 | 10% | 不該找到相關記憶，包含「別人有這筆記憶、本人沒有」 |
 
 **無答案資料與小候選集**
@@ -561,6 +587,27 @@ LLM 只輸出前 5 個欄位（`MemoryDraft`），其餘由程式補上。這輪
 **驗收：** 標註指南完成；至少 20% 樣本完成第二次獨立標註且 Cohen's κ ≥ 0.7（暫定）；日文 Query 經審閱，問題與修改都有紀錄；Query 集切分為開發集（調流程）與測試集（只用於最終評估）。
 
 **手動測試：** `memrag dataset validate`、`memrag dataset show-query <id>`
+
+**結果（2026-11-07）**
+
+| 項目 | 結果 |
+|---|---|
+| 模擬使用者 | 20 人，8–91 歲，含關西腔、京都腔與小孩的說話方式；全部虛構 |
+| Gold Facts | 400 筆（每人 20 筆），8 種 `category` 都有；9 組事實更新（`supersedes`） |
+| 測試問題 | 201 題：直接 40、改寫 40、表記與語體 40、人物限定 37、時間與類型 24、無答案 20 |
+| 標註 | 267 筆（2 分 201、1 分 66），沒列出的配對是 0 分 |
+| 切分 | 依問題類型分層：開發集 81 題、測試集 120 題 |
+| 第二次獨立標註 | 50 題（25%），Cohen's κ 0.90（裁決前，全部 1,000 組配對）；只看任一方標為相關的配對 κ 0.63 |
+| 日文審閱 | 27 項（高 0、中 12、低 15），全部處理 |
+
+- **刻意設計的干擾：** 不同人有相似的事實（孫來訪、釣魚、看眼科、健康檢查、鄰居），讓「人物限定」題能測出不加 `person_id` 過濾時會不會拿錯人的記憶；無答案題多半問「別人有、本人沒有」的事。
+- **審閱抓到的出題錯誤：** 3 題在 11/1 說「来月」卻指 11 月的預定，已改成「今月」；另有 2 個日期與日間照護的星期衝突、1 個年齡算錯，都已修正。
+- **指南修訂：** 兩次標註主要的分歧是背景事實該給 1 分還是 0 分。指南改成 1 分只給同一件事的舊版本、感受、其他步驟、治療所針對的狀況或部分回答，並依此重新檢查全部標註，把 25 筆背景事實改成 0 分。
+- **限制：** 兩次標註都是 Claude，不是日文母語者，κ 可能偏高。
+
+詳細的裁決與審閱紀錄見 `docs/annotation_review.md`。
+
+**狀態：** 驗收項目全部達成：標註指南完成；25% 樣本完成第二次獨立標註且 κ 0.90 ≥ 0.7；日文經審閱，問題與修改都有紀錄；已切分開發集與測試集。
 
 ### 5.1.4 Dummy Log Generation & Summarization Pipeline
 
@@ -624,7 +671,7 @@ flowchart LR
 - 無結果與 `event_date` 為空時，行為符合文件
 - 分別記錄 HNSW 相對於精確搜尋的 Recall
 
-**手動測試：** `memrag search "..." --person p001 --type event --from 2026-01-01 --to 2026-06-30`
+**手動測試：** `memrag search "..." --person p001 --category event --from 2026-01-01 --to 2026-06-30`
 
 ### 5.1.6 Full RAG Pipeline Integration
 
@@ -683,6 +730,8 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 - 雲端 LLM 的延遲另外標示，不與本地運算混算
 - 量不到的欄位記為 `N/A`（不是 0）
 
+**適用範圍（D2）：** 正式部署在自架伺服器，Nano 上的數字只用來比較模型之間的相對差異與找出瓶頸階段。部署伺服器確定後，用同一套 `memrag profile` 在伺服器上重跑，得到正式數字。
+
 **驗收：** 各階段耗時加總與端到端總耗時差距 < 5%；Profiler 開銷經量測並記錄；報告明確列出瓶頸階段。
 
 **手動測試：** `memrag profile --config configs/experiments/smoke.yaml`，或 `memrag ask ... --trace`
@@ -698,7 +747,7 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 | 模型 | 5.1.2 入選的 4–6 個 |
 | 裝置 | CUDA 為主；綜合前 2 名另測 CPU，作為備援參考 |
 | 搜尋方式 | Exact（比較模型品質）、HNSW（評估實際部署） |
-| 過濾 | 無過濾、`person_id`、`person_id` + `date`/`type` |
+| 過濾 | 無過濾、`person_id`、`person_id` + `date`/`category` |
 | 分組 | Query 類別、候選數（2、5、10、50、該人全部記憶） |
 
 **指標定義**
@@ -735,7 +784,7 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 **公平性控制**
 
 - 統一 `max_seq_length`（上限 512，確認語料不被截斷）
-- 所有向量做 L2 正規化；所有模型統一使用 float32
+- 所有向量做 L2 正規化；所有模型統一使用 float32（5.1.2 載入量測時 Qwen3 用的是 bfloat16，指標測試要改用 float32）
 - 語料已凍結，指標測試不載入 LLM，記憶體只反映 Embedding 與向量庫；兩者並存的情況由 5.1.7 量測
 - 每個模型套用模型卡規定的 prefix，並寫入 manifest
 - 先用 `smoke.yaml` 預估時間，再啟動完整矩陣
@@ -744,21 +793,32 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 
 **手動測試：** UI 的 Compare 分頁、`memrag eval --query <id> --explain`
 
+**預評估：以 Gold Facts 當記憶庫（2026-11-07 加入）**
+
+使用者決定先測 Embedding 模型，不等 5.1.4 的 LLM 總結。做法是把 400 筆 Gold Facts 的原文直接當記憶庫，這相當於「總結完全正確」的理想情況，結果只反映 Embedding 模型本身。只用開發集，測試集保留到正式評估。
+
+- 指令：`memrag eval run --models all --split dev`；所有模型 float32、精確 cosine 搜尋
+- 三種搜尋範圍：不過濾（20 人共 400 筆）、只搜本人、本人加題目的日期／類別過濾
+- 指標：nDCG@10、Recall@k、MRR@10，以及 Bootstrap 95% 信賴區間與逐題配對比較；無答案題只算第一名分數的 AUC，正式的閾值指標之後再做
+- 5.1.4 完成後，用 LLM 總結出的記憶再跑一次，比較兩者的排名是否一致
+
+**狀態：** 預評估完成（run_id `20261107-221101_retrieval_eval`）。只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge-base-zh-v1.5 0.780；前四名信賴區間重疊。指標函式通過手算案例，與 `ranx` 的交叉驗證、閾值校準、HNSW 與測試集評估還沒做。
+
 ### 5.1.9 Result Analysis & Embedding Model Selection
 
 **兩階段決策（`selection.yaml`，數值暫定，開跑前凍結）**
 
-1. **硬性門檻：** 授權符合 D3；Embedding 加向量庫的系統記憶體增量 ≤ 3 GiB（總量 7.3 GiB 扣除系統與約 2 GB LLM 後的餘裕）；Query P95 ≤ 500 ms（依 D2 調整）；`person_id` 過濾無跨人錯誤；小候選集（2–10 筆）的無答案誤召回率，在測試集的 95% 信賴區間下限 ≤ 5%
-2. **加權排名：**
+1. **硬性門檻：** 授權符合 D3；`person_id` 過濾無跨人錯誤；小候選集（2–10 筆）的無答案誤召回率，在測試集的 95% 信賴區間下限 ≤ 5%。記憶體與延遲的上限依部署伺服器規格（D10）訂定；規格確定前暫用 Query P95 ≤ 500 ms、Embedding 加向量庫的記憶體 ≤ 3 GiB，以 Nano 數字判斷
+2. **加權排名（2026-11-07 依 D2 調整）：** 正式環境是自架伺服器，資源比 Nano 寬裕，所以提高檢索品質的比重、降低延遲與記憶體的比重；索引建置時間只在資料寫入時發生，改為只回報、不計分
 
-| 面向 | 權重 |
-|---|---:|
-| nDCG@10 | 35% |
-| Recall@5 | 20% |
-| 小候選集（2–10 筆）正確記憶誤擋率，越低越好 | 15% |
-| Query Latency | 15% |
-| 記憶體 | 10% |
-| Index Build Time | 5% |
+| 面向 | 權重 | 調整前 |
+|---|---:|---:|
+| nDCG@10 | 40% | 35% |
+| Recall@5 | 25% | 20% |
+| 小候選集（2–10 筆）正確記憶誤擋率，越低越好 | 20% | 15% |
+| Query Latency | 10% | 15% |
+| 記憶體 | 5% | 10% |
+| Index Build Time | 不計分 | 5% |
 
 **決策規則：** 前幾名差距未達顯著時，選擇較輕量、授權較單純的模型。
 
@@ -812,19 +872,21 @@ def test_person_filter_never_leaks_other_person(): ...
 
 **位置：** 不另外開網站，直接在現有的[計畫書網頁](https://claude.ai/artifact/6BzFmMb5emzFfcpyz8Lpiz)新增分頁。網頁分成「計畫書」和「測試結果」兩個分頁，「測試結果」頂端用一個下拉選單切換每一次的主題。
 
-**紀錄規則（每一次都要記）**
+**用途：** 在週會報告實驗結果，所以只放模型比較、準確度、效能與選型結論，不放每一個操作步驟（2026-11-07 使用者決定）。
 
-- **範圍：** 模型查找與調查、環境檢查、自動測試、手動測試、Profiling、指標評估、選型分析都要記錄。正式執行每次新增一筆，重跑也算新的一筆。
-- **開發中重複的測試：** 開發時反覆跑的單元測試或檢查，依主題合併成一筆，保留執行次數、最後結果和曾出現的失敗。
-- **不挑結果：** 失敗、中止、不符預期的結果都要記，並寫明原因。
+**紀錄規則**
+
+- **放上網頁：** 模型調查與篩選、模型效能量測、檢索指標評估、選型分析。每次正式實驗一筆，重跑也算新的一筆。
+- **不放上網頁：** 環境檢查、開發中的自動測試、模型下載、手動測試、修 bug 的過程。需要追查時看 git 紀錄與 `results/runs/`。2026-11-07 以前已寫的 15 筆過程紀錄移到 `reports/log/` 存檔，之後不再新增。
+- **不挑結果：** 實驗結果不好、中途失敗或發現問題，都要寫在該次實驗紀錄裡並說明原因，例如模型因相容性問題被移出。
 - **只增不改：** 舊紀錄不覆寫。發現錯誤時新增一筆修正紀錄，並和原紀錄互相連結。
-- **完成條件：** 紀錄寫入、網頁更新、同步到 Nano 都做完，這次測試才算完成。
+- **完成條件：** 紀錄寫入、總覽的模型比較表更新、網頁發布、同步到 Nano 都做完，這次實驗才算完成。
 - **內容限制：** 不放密碼、API Key 或真實個資。
 
 **下拉選單**
 
-- **第一項「總覽」：** 任務進度 5.1.1–5.1.9、通過／失敗統計、目前選型結論、全部紀錄清單。
-- **其他項目：** 依任務分組，最新的在前，每項顯示 `日期｜主題｜狀態`，例如 `2026-11-06｜Nano 環境與 GPU 檢查｜資訊`。
+- **第一項「總覽」：** 給週會直接使用：目前選型結論、本期重點、模型比較總表、下一步、任務進度、實驗紀錄清單。
+- **其他項目：** 依任務分組，最新的在前，每項顯示 `日期｜主題｜狀態`，例如 `2026-11-07｜模型載入量測與首輪名單｜通過`。
 - **直接連結：** 網址帶紀錄 ID（`#record=<id>`），可以直接分享某一筆。
 
 **每筆紀錄的內容**
@@ -845,10 +907,8 @@ def test_person_filter_never_leaks_other_person(): ...
 | 類型 | 結果內容 | 主要資料來源 |
 |---|---|---|
 | 模型調查 | 模型大小、維度、授權、prefix、JMTEB 分數、篩選理由 | 模型卡、MTEB Leaderboard |
-| 環境檢查 | 硬體、版本、記憶體與磁碟、檢查項目結果 | `memrag env check` |
-| 自動測試 | 通過／失敗／跳過、失敗訊息、覆蓋率 | JUnit、coverage |
-| 手動測試 | 測試項目、預期與實際結果、測試者 | manual JSON |
-| Profiling | 各階段延遲與記憶體圖表、瓶頸標示 | `profile.jsonl` |
+| 模型篩選 | 入選或移出的理由與證據，例如相容性檢查 | 實測輸出 |
+| 效能量測 | 各模型或各階段的延遲與記憶體、瓶頸標示 | `load_probe.jsonl`、`profile.jsonl` |
 | 指標評估 | 指標總表、信賴區間、Recall@k 曲線、分組分析、閾值與小候選集結果、單筆 Query 下鑽 | `metrics.json`、`per_query.jsonl` |
 | 選型分析 | 門檻結果、加權排名、敏感度分析、ADR 連結 | selection |
 
@@ -863,21 +923,18 @@ Nano 執行並產生 results/runs/<run_id>/
 ```
 
 - **沒有 `run_id` 的紀錄：** 模型調查這類工作用 `memrag report add --type survey --from <檔案>` 新增。
-- **Library 完成前：** 5.1.2 做出 `memrag report` 之前，紀錄手動新增，再用 `scripts/build_results_tab.ps1` 寫入網頁。
+- **`memrag report` 做好之前：** 紀錄與 `overview.json` 手動維護，再用 `scripts/build_results_tab.ps1` 寫入網頁。
 - **一鍵流程：** Nano 上的 `scripts/run_all.sh` 依序執行 `pytest`、`memrag profile`、`memrag eval`，結果再照上面的流程處理。
 - **離線與權限：** `docs/project_plan.html` 的資料都內嵌在檔案內，雙擊就能離線開啟；只有流程圖要連網載入，離線時會顯示原始文字。線上網頁預設是私人的，要從 Share 開放權限，其他人才能看。
 - **檔案大小：** 線上網頁上限 16 MB。建置時檢查大小，超過 12 MB 就把較舊紀錄的單筆 Query 明細移出網頁，改成指向 `results/` 的路徑；`reports/records/` 的紀錄本身不變。
 
-**首批補登（2026-11-07 已放上網頁）**
+**目前網頁上的實驗（2026-11-07）**
 
 | 日期 | 主題 | 類型 | 任務 |
 |---|---|---|---|
-| 2026-11-06 | 初步候選模型卡查閱 | 模型調查 | 5.1.1 |
-| 2026-11-06 | Nano 環境與 GPU 檢查 | 環境檢查 | 5.1.2 |
-| 2026-11-06 | aarch64 套件相容性解析 | 環境檢查 | 5.1.2 |
-| 2026-11-07 | Nano 模型盤點與 Gemma 刪除 | 環境檢查 | 5.1.2 |
-| 2026-11-07 | README 覆蓋檢查與 Nano 同步驗證 | 環境檢查 | 5.1.2 |
-| 2026-11-07 | Prompt 格式與變數檢查 | 自動測試 | 5.1.4 |
+| 2026-11-07 | 候選 Embedding 模型調查 | 模型調查 | 5.1.1 |
+| 2026-11-07 | 模型載入量測與首輪名單 | 效能量測 | 5.1.2 |
+| 2026-11-07 | GLuCoSE 與 transformers 5 相容性檢查 | 模型篩選 | 5.1.2 |
 
 ---
 
@@ -904,6 +961,7 @@ Nano 執行並產生 results/runs/<run_id>/
 | 模型或依賴更新導致結果變動 | 無法重現 | 固定 revision、`uv.lock`、manifest |
 | 看到結果後調整標準 | 選型偏誤 | 門檻、權重與測試集開跑前提交版控 |
 | 公開榜單資料與本專案情境不同 | 誤判候選 | JMTEB 僅用於篩選參考，最終以本專案測試為準 |
+| 測試平台（Nano）與部署伺服器不同 | 延遲、記憶體數字不能直接套用到正式環境 | 選型以檢索品質為主；效能只比較模型間的相對差異；部署伺服器確定後重跑 `memrag profile`（D2、D10） |
 
 ---
 
@@ -914,7 +972,7 @@ Nano 執行並產生 results/runs/<run_id>/
 - [ ] 他人可依 `README.md` 從全新環境完成安裝並跑通冒煙測試
 - [ ] Library、CLI、手動測試 UI 三種入口都可完成 Embed、Search、Ask
 - [ ] `manual_testing.md` 由非開發者實際操作驗證過一次
-- [ ] 每一次測試與模型調查都有紀錄，可從測試結果分頁的下拉選單查看，包含失敗與中止的結果
+- [ ] 每一次實驗（模型調查與篩選、效能量測、指標評估、選型分析）都有紀錄，可從測試結果分頁的下拉選單查看，包含結果不佳或中止的實驗
 - [ ] Nano 上的 `run_all.sh` 可一鍵跑完測試與評估，結果取回 Windows 後可更新網頁，網頁也能離線開啟
 - [ ] 專案結束時 Nano 上只新增 `~/50019/rag_test`；暫停的服務都已重啟；除 D9 已刪除的模型外，未更動其他專案、服務或系統設定
 - [ ] 選型報告與 ADR 完成，數字都可追溯到 `run_id`

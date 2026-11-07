@@ -2,7 +2,7 @@
   "title": "模型載入量測與首輪名單",
   "date": "2026-11-07",
   "task": "5.1.2",
-  "type": "Profiling",
+  "type": "效能量測",
   "status": "通過",
   "backfilled": false,
   "purpose": "5 個候選與對照組在 Nano 的 CUDA 與 CPU 上能不能載入？載入時間、記憶體和單句延遲是多少？",

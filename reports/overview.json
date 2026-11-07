@@ -1,16 +1,41 @@
 {
-  "headline": "首輪名單確定，還沒有檢索品質的結果",
-  "summary": "5.1.2 已在 Nano 上載入 5 個候選和 1 個對照組，並量測載入時間、記憶體與單句延遲，全部在門檻內。Recall、MRR、nDCG 等檢索指標要等 5.1.3–5.1.8 建好資料後才有。",
-  "conclusion": "尚未選型。首輪候選為 ruri-v3-30m、ruri-v3-130m、ruri-v3-310m、Qwen3-Embedding-0.6B、multilingual-e5-small，產品現用的 bge-base-zh-v1.5 當對照組；GLuCoSE 因 transformers 5 不相容而移出。",
+  "headline": "首次準確度結果：ruri 系列最好，產品現用的 bge 明顯最差",
+  "summary": "把 400 筆標準事實直接當記憶庫，用開發集 81 題測 6 個模型，只比較 Embedding 本身。只搜本人時，ruri-v3-310m 的 nDCG@10 最高（0.945），ruri-v3-30m 與 Qwen3 和它的差距不顯著；產品現用的 bge-base-zh-v1.5 只有 0.780。這是初步結果：還沒用 LLM 總結出來的記憶，也還沒用測試集。",
+  "conclusion": "尚未選型。初步排名：ruri-v3-310m ≥ ruri-v3-30m ≈ Qwen3-Embedding-0.6B ≈ ruri-v3-130m > multilingual-e5-small > bge-base-zh-v1.5（對照組）。",
+  "findings": [
+    "只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge 0.780；前四名的信賴區間重疊，還要更多資料才分得出來。",
+    "差距最大的是表記差異題（漢字、平假名、簡稱）：ruri-v3-130m／310m 約 0.96，bge 只有 0.66。",
+    "不加 person_id 過濾時，26%–49% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
+    "時間與類別的問題只靠 Embedding 找不到（nDCG@10 0.04–0.25），套上日期／類別過濾後 6 個模型都是 1.0；這類問題要靠 metadata。",
+    "效能上 6 個模型在 Nano GPU 的單句延遲都在 84 ms 內，記憶體峰值都在 1.7 GiB 內；ruri-v3-30m 速度最快，準確度和 310m 的差距不顯著，是輕量的選項。"
+  ],
+  "comparison": {
+    "caption": "模型比較總表（2026-11-07）",
+    "columns": ["模型", "角色", "nDCG@10（只搜本人）", "Recall@5", "表記差異題 nDCG", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
+    "numeric": [2, 3, 4, 5, 6, 7, 8],
+    "rows": [
+      ["ruri-v3-310m", "候選", "0.945", "0.968", "0.956", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
+      ["ruri-v3-30m", "候選", "0.931", "0.948", "0.874", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
+      ["Qwen3-Embedding-0.6B", "候選", "0.921", "0.945", "0.852", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
+      ["ruri-v3-130m", "候選", "0.920", "0.964", "0.963", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
+      ["multilingual-e5-small", "候選", "0.871", "0.899", "0.714", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
+      ["bge-base-zh-v1.5", "對照組（產品現用）", "0.780", "0.849", "0.664", "—", "20.0 ms", "734 MiB", "104.6 ms"]
+    ],
+    "note": "準確度：開發集 73 題有答案的問題，記憶庫是 400 筆標準事實原文，只搜該使用者的記憶，精確搜尋；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
+  },
+  "next": [
+    "5.1.4：用 Qwen3-1.7B 產生模擬對話並總結成記憶 JSON，用相同評估看真實總結下排名是否改變。",
+    "5.1.8：閾值校準與小候選集誤擋率；最後用測試集 120 題做正式評估。"
+  ],
   "tasks": [
-    { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成；列出調查表的 CLI 尚未做" },
-    { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：環境、registry、CLI、載入量測、首輪名單" },
-    { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "尚未開始" },
-    { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "尚未開始，只有 prompt 草稿" },
-    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始；ChromaDB 已通過讀寫檢查" },
+    { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成" },
+    { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：首輪名單與效能量測" },
+    { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "完成：201 題測試問題與標準答案，κ 0.90" },
+    { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "尚未開始" },
+    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（這次先用精確搜尋）" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
-    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "尚未開始" },
+    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "進行中：開發集初步結果（標準事實當記憶庫）" },
     { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "尚未開始" }
   ]
 }

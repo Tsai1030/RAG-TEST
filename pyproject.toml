@@ -12,6 +12,7 @@ dependencies = [
   "huggingface-hub",
   "sentencepiece",
   "psutil",
+  "pydantic>=2",
   "pyyaml",
   "numpy",
 ]

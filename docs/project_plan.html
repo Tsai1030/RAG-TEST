@@ -373,7 +373,7 @@ td.nowrap { white-space: nowrap; }
 
   <main>
     <header class="hero">
-      <p class="eyebrow">WBS 5.1 · v0.11 草案 · 2026-11-07</p>
+      <p class="eyebrow">WBS 5.1 · v0.14 草案 · 2026-11-07</p>
       <h1>對話記憶 RAG：Embedding 模型評估與選型計畫書</h1>
       <p class="lede">以日文對話記憶情境選出最適合的 Embedding 模型，並用真實 pipeline 的量測數據支持這個決定。</p>
       <ol class="pipeline" aria-label="RAG 流程與負責任務">
@@ -387,7 +387,7 @@ td.nowrap { white-space: nowrap; }
       <dl class="meta">
         <div><dt>最終交付</dt><dd>選型決策、可重現的 RAG pipeline、Library 與手動測試介面、測試結果網頁</dd></div>
         <div><dt>估計工時</dt><dd>約 21.5 人天（估計值，開始日期待定）</dd></div>
-        <div><dt>執行平台</dt><dd>Jetson Orin Nano Super（GPU）；Windows 筆電僅用於開發與遠端操作</dd></div>
+        <div><dt>執行平台</dt><dd>開發與測試：Jetson Orin Nano Super（GPU）；Windows 筆電僅用於開發與遠端操作。正式部署：自架伺服器（預計在 AWS），不使用外部 API（D2）</dd></div>
         <div><dt>Python 套件名稱</dt><dd><code>memrag</code>（暫定）</dd></div>
       </dl>
     </header>
@@ -399,7 +399,7 @@ td.nowrap { white-space: nowrap; }
         <li>候選模型調查、篩選與 CPU 載入驗證</li>
         <li>記憶 Schema、測試 Query 與 Ground Truth（只做日文）</li>
         <li>假對話 Log 生成與摘要（結構化輸出、驗證、重試）</li>
-        <li>向量資料庫與過濾檢索（<code>person_id</code> / <code>date</code> / <code>type</code>）</li>
+        <li>向量資料庫與過濾檢索（<code>person_id</code> / <code>date</code> / <code>category</code>）</li>
         <li>完整 RAG 串接：Log → Summarize → Embed → Store → Retrieve → LLM Answer</li>
         <li>各階段延遲與記憶體量測、模型指標測試、結果分析與選型</li>
         <li>分層專案結構、Library、CLI、手動測試 UI、測試結果網頁</li>
@@ -438,19 +438,22 @@ td.nowrap { white-space: nowrap; }
       </table></div>
       <p><strong>開發機：</strong>Windows 筆電（i3-10110U、約 16 GB RAM、無 NVIDIA GPU），路徑 <code>D:\RAG TEST</code>，只用於寫程式和跑快速測試，效能數據不採計。</p>
       <h3>2.2 需要確認的決策</h3>
-      <p>未回覆時依「預設」進行，所有預設都可透過設定檔切換。<strong>已確認：</strong>向量庫先用 ChromaDB（見 5.1.5）；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 <code>~/50019/rag_test</code>；Windows 專案資料全部同步到 Nano（見 2.3）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 <code>bge-base-zh-v1.5</code> 加入當對照組（見 5.1.1）。</p>
+      <p>未回覆時依「預設」進行，所有預設都可透過設定檔切換。<strong>已確認：</strong>向量庫先用 ChromaDB（見 5.1.5）；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 <code>~/50019/rag_test</code>；Windows 專案資料全部同步到 Nano（見 2.3）；正式部署在自架伺服器，不用外部 API（D2）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 <code>bge-base-zh-v1.5</code> 加入當對照組（見 5.1.1）。</p>
       <div class="table-wrap xwide"><table>
         <thead><tr><th>#</th><th>問題</th><th>預設</th><th>影響</th></tr></thead>
         <tbody>
           <tr><td class="nowrap"><span class="pill warn">D1</span></td><td>GPU 記憶體數據這樣呈現可以嗎？</td><td>Nano 沒有獨立 VRAM，改報 PyTorch GPU 配置峰值與系統記憶體增量</td><td>原排程的 VRAM 欄位將採用這個定義</td></tr>
-          <tr><td class="nowrap"><span class="pill warn">D2</span></td><td>最終部署硬體也是這台 Nano 嗎？</td><td>是，選型門檻以 Nano 為準</td><td>若部署到其他硬體，效能部分要重測</td></tr>
+          <tr><td class="nowrap"><span class="pill warn">D2</span></td><td>最終部署硬體也是這台 Nano 嗎？</td><td><strong>已確認不是（2026-11-07）。</strong>正式部署在自架伺服器（預計在 AWS），自行執行開源模型，不使用外部 API</td><td>檢索品質的結果直接適用。Nano 改為開發與測試平台，它的延遲與記憶體數字只作模型間的相對比較；正式數字要在部署伺服器重測。硬性門檻與權重已依此調整（見 5.1.9）</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D3</span></td><td>系統是否會商用？</td><td><strong>已確認會商用（2026-11-07）</strong></td><td>非商用授權的模型不可入選；Sarashina 因此排除</td></tr>
-          <tr><td class="nowrap"><span class="pill warn">D4</span></td><td>生成與摘要使用哪個 LLM？</td><td>Nano 上以 llama.cpp 跑 <code>Qwen3-1.7B-Q4_K_M</code>（這台已有常駐服務以 <code>-ngl 99</code> 載入此模型）；假對話量大，先測速度，不夠快才改雲端 API；測試用 Replay</td><td>日文摘要品質與速度都還沒驗證，於 5.1.4 實測</td></tr>
+          <tr><td class="nowrap"><span class="pill warn">D4</span></td><td>生成與摘要使用哪個 LLM？</td><td>Nano 上以 llama.cpp 跑 <code>Qwen3-1.7B-Q4_K_M</code>（這台已有常駐服務以 <code>-ngl 99</code> 載入此模型）；假對話量大，先測速度，不夠快才改雲端 API；測試用 Replay</td><td>日文摘要品質與速度都還沒驗證，於 5.1.4 實測。正式環境的當日對話總結也是自架 LLM（D2）；測試語料最好用與正式環境相近的模型產生，否則記憶的寫法會和上線時不同</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D5</span></td><td>回答階段的 LLM 為何？</td><td>與 D4 相同</td><td>影響 5.1.7 的 LLM 延遲是否有代表性</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D6</span></td><td>除日文外還要測哪些語言？</td><td><strong>已確認只做日文（2026-11-07）</strong></td><td>不製作其他語言與跨語言資料；多語模型仍可當候選，但只評估日文表現</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D7</span></td><td>誰負責第二位標註與日文審閱？</td><td><strong>已確認由 Claude 負責（2026-11-07）</strong>，做法見 5.1.3</td><td>不是人類母語者審閱，這項限制要寫進選型報告</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D8</span></td><td>常駐的 <code>llama-server</code>（:8090）與 <code>pocket_tts_server</code>（:8092）量測時可以暫停嗎？</td><td><strong>已確認可以暫停。</strong>只在量測時停止，結束後重啟</td><td>暫停後估計可用約 6.5 GiB。<code>SIGSTOP</code> 不會釋放記憶體，所以實際做法是結束行程，再依各服務的 README 重啟</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D9</span></td><td>磁碟只剩 8.7 GB，怎麼處理？</td><td><strong>已完成（2026-11-07）。</strong>刪除明確無人使用的 LM Studio Gemma 4 E4B GGUF（約 5.9 GiB）；其他模型都有程式引用或屬於其他專案，不刪</td><td>目前剩 15 GB。候選模型總大小仍限制在約 4 GB；加入對照組時預估約 4.2 GiB，使用者已同意（2026-11-07）；5.1.2 移出 GLuCoSE 後，首輪 6 個模型實際下載約 3.8 GiB。5.1.1 查到實際權重：Sarashina 約 4.6 GiB，超過 3 GiB 記憶體門檻；PLaMo 約 2.0 GiB，原本估計的 4 GB 有誤，改列備選</td></tr>
+          <tr><td class="nowrap"><span class="pill warn">D10</span></td><td>部署伺服器的規格？（有沒有 NVIDIA GPU、記憶體多大）</td><td><strong>已確認（2026-11-07）：本輪只用 Nano 測試。</strong>目的是找出日文最好的 Embedding 模型，伺服器規格之後再定</td><td>延遲與記憶體門檻沿用 Nano 的數字；選型以檢索品質為主</td></tr>
+          <tr><td class="nowrap"><span class="pill warn">D11</span></td><td>因 Nano 記憶體而沒列入的較大模型（<code>Nemotron-3-Embed-1B</code>、<code>PLaMo-Embedding-1B</code>）要加回嗎？</td><td><strong>已確認先不加（2026-11-07）</strong></td><td>首輪維持 5 個候選加 1 個對照組</td></tr>
+          <tr><td class="nowrap"><span class="pill warn">D12</span></td><td>記憶 JSON 要抽哪些事件欄位與 metadata？</td><td><strong>已確認（2026-11-07）：</strong>陪伴機器人與使用者的當日對話，用模擬資料；欄位採 Claude 建議的 6 個必要欄位加 <code>people</code>，見 5.1.3</td><td>測試語料的 Schema 與寫法應和正式環境一致；只有 <code>content</code> 會被向量化，所以影響最大的是 <code>content</code> 的寫法與分類方式；metadata 決定能用哪些條件過濾</td></tr>
         </tbody>
       </table></div>
       <h3>2.3 開發與執行流程</h3>
@@ -577,12 +580,12 @@ td.nowrap { white-space: nowrap; }
 │   │   ├── schemas/
 │   │   │   ├── embedding.py      # ModelSpec, EncodedText, prefix 規則
 │   │   │   ├── dialogue.py       # DialogueLog, Turn
-│   │   │   ├── memory.py         # MemoryDraft（LLM 輸出）, MemoryRecord, MemoryType
+│   │   │   ├── memory.py         # MemoryDraft（LLM 輸出）, MemoryRecord, Category
 │   │   │   ├── retrieval.py      # MemoryFilter, SearchHit, Answer
-│   │   │   └── evaluation.py     # GoldFact, TestQuery, Qrel, RunManifest
+│   │   │   └── evaluation.py     # Persona, GoldFact, TestQuery, QueryLabel
 │   │   ├── metrics/
 │   │   │   ├── retrieval.py      # Recall@k, MRR, nDCG
-│   │   │   └── statistics.py     # bootstrap 信賴區間
+│   │   │   └── statistics.py     # Cohen's κ、bootstrap 信賴區間、AUC
 │   │   ├── ports.py              # Port 介面定義
 │   │   └── errors.py             # 領域錯誤類別
 │   │
@@ -595,6 +598,8 @@ td.nowrap { white-space: nowrap; }
 │   │   ├── answer.py             # 依檢索結果產生回答與引用
 │   │   ├── pipeline.py           # 串接全流程
 │   │   └── evaluation/
+│   │       ├── dataset_check.py  # 標準答案檢查、切分、抽樣、標註一致度
+│   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：三種過濾範圍、逐題指標、配對比較
 │   │       ├── qrels.py          # 編譯 Qrels
 │   │       ├── metric_runner.py  # 模型 × 設定 測試矩陣
 │   │       ├── profile_runner.py # 各階段延遲與記憶體量測
@@ -651,7 +656,7 @@ td.nowrap { white-space: nowrap; }
 │   └── fixtures/                 # 小型日文樣本、LLM 錄製回應
 │
 ├── data/                         # 依流程階段編號
-│   ├── 00_gold/                  # gold_facts.jsonl, queries.jsonl, labels.jsonl
+│   ├── 00_gold/                  # personas, gold_facts, queries, labels（兩次標註）、抽樣清單
 │   ├── 01_dialogues/             # 假對話 Log
 │   ├── 02_memories/              # 凍結的記憶語料
 │   ├── 03_qrels/                 # 編譯後的相關性標註、小候選集定義
@@ -665,14 +670,16 @@ td.nowrap { white-space: nowrap; }
 │   └── metrics.json / per_query.jsonl # 整體與單筆 Query 指標
 │
 ├── reports/
-│   ├── overview.json             # 分頁「總覽」的目前結論與任務進度
-│   └── records/                  # 每次測試與模型調查的紀錄，一次一檔（進版控）
+│   ├── overview.json             # 分頁「總覽」：結論、本期重點、模型比較總表、任務進度
+│   ├── log/                      # 2026-11-07 以前的過程紀錄存檔，不放上網頁
+│   └── records/                  # 實驗結果，一次實驗一檔（進版控）
 │       └── &lt;日期&gt;_&lt;主題&gt;.json     # 網頁下拉選單的一個項目
 │
 ├── docs/
 │   ├── survey/                   # 5.1.1：model_survey.md、mteb_japanese_retrieval.json
 │   ├── schema/memory_schema.md   # 5.1.3
 │   ├── annotation_guide.md       # 5.1.3
+│   ├── annotation_review.md      # 5.1.3：兩次標註的分歧裁決與日文審閱紀錄
 │   ├── manual_testing.md         # 手動測試手冊
 │   ├── project_plan.html         # 計畫書網頁的原始檔，含測試結果分頁
 │   ├── analysis/selection_report.md  # 5.1.9
@@ -719,7 +726,7 @@ print(report.accepted, report.rejected, report.retries)
 # 過濾檢索
 hits = rag.search(
     "田中さんの好きな食べ物は？",
-    filters=MemoryFilter(person_id="p001", type="preference", date_from="2026-01-01"),
+    filters=MemoryFilter(person_id="p001", category="preference", date_from="2026-01-01"),
     top_k=5,
 )
 
@@ -738,9 +745,13 @@ uv run memrag models probe --devices cuda,cpu # 每個模型在獨立子行程�
 uv run memrag prompt list                     # 所有 prompt 與版本
 uv run memrag prompt show summarize --version v1 # 查看 prompt 內容與 hash
 uv run memrag embed "こんにちは" --model ruri-v3-130m --kind query --explain
+uv run memrag dataset validate                # 標準答案的格式與一致性檢查、統計
+uv run memrag dataset show-query q_p01_05     # 查看一題與它的相關事實
+uv run memrag dataset agreement               # 兩次標註的 Cohen's κ
+uv run memrag eval run --models all --split dev # 檢索準確度（目前以 Gold Facts 當記憶庫，精確搜尋）
 uv run memrag summarize tests/fixtures/dialogue_ja_001.json --json
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
-uv run memrag search "好きな食べ物" --person p001 --type preference --from 2026-01-01 -k 5
+uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
 uv run memrag profile --config configs/experiments/smoke.yaml
 uv run memrag eval --config configs/experiments/full_metric.yaml
@@ -756,7 +767,7 @@ uv run memrag ui                              # 啟動手動測試 UI</code></pr
         <tbody>
           <tr><td>Embedding</td><td>輸入文字、選模型與 kind，查看 prefix、維度、耗時，比較兩句相似度</td></tr>
           <tr><td>Summarize</td><td>貼上對話 Log，查看 LLM 原始輸出、驗證錯誤、重試過程、最終記憶</td></tr>
-          <tr><td>Search</td><td>設定 <code>person_id</code> / <code>date</code> / <code>type</code> / <code>top_k</code>，查看分數、是否通過閾值與 metadata</td></tr>
+          <tr><td>Search</td><td>設定 <code>person_id</code> / <code>date</code> / <code>category</code> / <code>top_k</code>，查看分數、是否通過閾值與 metadata</td></tr>
           <tr><td>Compare</td><td>同一 Query 並排比較多個模型的檢索結果</td></tr>
           <tr><td>Ask</td><td>完整問答，顯示通過閾值的記憶、Context、引用與各階段耗時</td></tr>
           <tr><td>Feedback</td><td>把手動發現的問題 Query 存成候選，<strong>審閱後</strong>才可加入 Query 集</td></tr>
@@ -768,7 +779,7 @@ uv run memrag ui                              # 啟動手動測試 UI</code></pr
 
     <section id="tasks">
       <h2>7 各任務工作內容</h2>
-      <p>每項任務都要同時交付：功能程式、Library/CLI 入口、測試、手冊章節、測試結果分頁的紀錄，以及所有變動資料夾的 README。</p>
+      <p>每項任務都要同時交付：功能程式、Library/CLI 入口、測試、手冊章節、所有變動資料夾的 README；有實驗結果的任務，還要把結果放上測試結果分頁（見第 9 節）。</p>
 
       <article class="task" id="t1">
         <div class="task-head">
@@ -873,15 +884,18 @@ ruri-v3-130m:
           <span class="task-id">5.1.3 · 3.0 人天</span>
           <h3>Memory Schema, Query Set &amp; Ground Truth</h3>
         </div>
-        <h4>記憶 Schema（Pydantic，附 <code>schema_version</code>）</h4>
+        <p><strong>情境（D12，2026-11-07 確認）：</strong>陪伴機器人每天把和使用者的對話總結成幾筆記憶，存進向量庫；之後使用者說話時，機器人依這句話找出相關記憶。全部用模擬資料。</p>
+        <h4>記憶 Schema（Pydantic，附 <code>schema_version</code>，詳見 <code>docs/schema/memory_schema.md</code>）</h4>
         <div class="table-wrap wide"><table>
           <thead><tr><th>欄位</th><th>型別</th><th>來源</th><th>說明</th></tr></thead>
           <tbody>
-            <tr><td><code>person_id</code></td><td>str</td><td>LLM</td><td>必填，用於過濾</td></tr>
-            <tr><td><code>type</code></td><td>enum</td><td>LLM</td><td><code>fact</code> / <code>preference</code> / <code>event</code> / <code>relationship</code> / <code>plan</code></td></tr>
-            <tr><td><code>content</code></td><td>str</td><td>LLM</td><td>被向量化的日文記憶文字</td></tr>
-            <tr><td><code>event_date</code></td><td>date | null</td><td>LLM</td><td>事件日期（ISO 8601）</td></tr>
-            <tr><td><code>source_turn_ids</code></td><td>list[int]</td><td>LLM</td><td>證據對話輪次</td></tr>
+            <tr><td><code>category</code></td><td>enum</td><td>LLM</td><td>8 類，見下表；可用來過濾</td></tr>
+            <tr><td><code>content</code></td><td>str</td><td>LLM</td><td>1–2 句日文記憶，<strong>唯一被向量化的欄位</strong></td></tr>
+            <tr><td><code>event_date</code></td><td>date | null</td><td>LLM</td><td>事件發生或預定的日期（ISO 8601），可用日期範圍過濾</td></tr>
+            <tr><td><code>people</code></td><td>list[str]</td><td>LLM</td><td>記憶中提到的人，例如 <code>["孫の結衣"]</code>；沒有就是空清單</td></tr>
+            <tr><td><code>source_turn_ids</code></td><td>list[int]</td><td>LLM</td><td>證據對話輪次，用來檢查摘要有沒有亂編</td></tr>
+            <tr><td><code>person_id</code></td><td>str</td><td>程式</td><td>對話的使用者；機器人一定知道在跟誰說話，所以由程式依對話 Log 填入，不讓 LLM 判斷</td></tr>
+            <tr><td><code>conversation_date</code></td><td>date</td><td>程式</td><td>這筆記憶來自哪一天的對話</td></tr>
             <tr><td><code>memory_id</code></td><td>str</td><td>程式</td><td>依內容產生的穩定 ID</td></tr>
             <tr><td><code>event_date_ord</code></td><td>int | null</td><td>程式</td><td><code>YYYYMMDD</code> 整數，供範圍過濾</td></tr>
             <tr><td><code>source_log_id</code></td><td>str</td><td>程式</td><td>來源對話</td></tr>
@@ -889,7 +903,20 @@ ruri-v3-130m:
             <tr><td><code>gold_fact_ids</code></td><td>list[str]</td><td>評估資料</td><td>僅評估時使用，不給 LLM 看</td></tr>
           </tbody>
         </table></div>
-        <p>LLM 只輸出前 5 個欄位（<code>MemoryDraft</code>），其餘由程式補上。這輪 Schema 是固定條件，不比較不同格式。</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th><code>category</code></th><th>日文</th><th>內容</th></tr></thead>
+          <tbody>
+            <tr><td><code>event</code></td><td>出来事</td><td>當天或過去發生的事</td></tr>
+            <tr><td><code>plan</code></td><td>予定</td><td>未來的安排</td></tr>
+            <tr><td><code>preference</code></td><td>好み</td><td>喜歡或討厭的東西</td></tr>
+            <tr><td><code>relationship</code></td><td>人間関係</td><td>家人、朋友、寵物</td></tr>
+            <tr><td><code>health</code></td><td>健康・体調</td><td>身體狀況、睡眠、服藥</td></tr>
+            <tr><td><code>emotion</code></td><td>気持ち</td><td>情緒、擔心的事</td></tr>
+            <tr><td><code>routine</code></td><td>習慣</td><td>日常作息</td></tr>
+            <tr><td><code>profile</code></td><td>プロフィール</td><td>住處、職業、出身等基本資料</td></tr>
+          </tbody>
+        </table></div>
+        <p>LLM 只輸出前 5 個欄位（<code>MemoryDraft</code>），其餘由程式補上。<code>importance</code>、<code>emotion</code> 這類選用 metadata 本輪不做。這輪 Schema 是固定條件，不比較不同格式。</p>
         <h4>Query 集（目標 150–200 筆，全部日文）</h4>
         <div class="table-wrap"><table>
           <thead><tr><th>類別</th><th class="num">佔比</th><th>測試重點</th></tr></thead>
@@ -898,7 +925,7 @@ ruri-v3-130m:
             <tr><td>改寫／同義</td><td class="num">20%</td><td>語意能力</td></tr>
             <tr><td>日文表記與語體</td><td class="num">20%</td><td>漢字／假名、敬語／口語、縮寫</td></tr>
             <tr><td>人物限定</td><td class="num">15%</td><td>相似內容屬於不同人</td></tr>
-            <tr><td>時間與類型限定</td><td class="num">15%</td><td>日期與 type 過濾</td></tr>
+            <tr><td>時間與類型限定</td><td class="num">15%</td><td>日期與 category 過濾</td></tr>
             <tr><td>無答案</td><td class="num">10%</td><td>不該找到相關記憶，包含「別人有這筆記憶、本人沒有」</td></tr>
           </tbody>
         </table></div>
@@ -926,6 +953,29 @@ ruri-v3-130m:
         <dl class="outcome">
           <div><dt>驗收</dt><dd>標註指南完成；至少 20% 樣本完成第二次獨立標註且 Cohen's κ ≥ 0.7（暫定）；日文 Query 經審閱，問題與修改都有紀錄；Query 集切分為開發集（調流程）與測試集（只用於最終評估）。</dd></div>
           <div><dt>手動測試</dt><dd><code>memrag dataset validate</code>、<code>memrag dataset show-query &lt;id&gt;</code></dd></div>
+        </dl>
+        <h4>結果（2026-11-07）</h4>
+        <div class="table-wrap wide"><table>
+          <thead><tr><th>項目</th><th>結果</th></tr></thead>
+          <tbody>
+            <tr><td>模擬使用者</td><td>20 人，8–91 歲，含關西腔、京都腔與小孩的說話方式；全部虛構</td></tr>
+            <tr><td>Gold Facts</td><td>400 筆（每人 20 筆），8 種 <code>category</code> 都有；9 組事實更新（<code>supersedes</code>）</td></tr>
+            <tr><td>測試問題</td><td>201 題：直接 40、改寫 40、表記與語體 40、人物限定 37、時間與類型 24、無答案 20</td></tr>
+            <tr><td>標註</td><td>267 筆（2 分 201、1 分 66），沒列出的配對是 0 分</td></tr>
+            <tr><td>切分</td><td>依問題類型分層：開發集 81 題、測試集 120 題</td></tr>
+            <tr><td>第二次獨立標註</td><td>50 題（25%），Cohen's κ 0.90（裁決前，全部 1,000 組配對）；只看任一方標為相關的配對 κ 0.63</td></tr>
+            <tr><td>日文審閱</td><td>27 項（高 0、中 12、低 15），全部處理</td></tr>
+          </tbody>
+        </table></div>
+        <ul>
+          <li><strong>刻意設計的干擾：</strong>不同人有相似的事實（孫來訪、釣魚、看眼科、健康檢查、鄰居），讓「人物限定」題能測出不加 <code>person_id</code> 過濾時會不會拿錯人的記憶；無答案題多半問「別人有、本人沒有」的事。</li>
+          <li><strong>審閱抓到的出題錯誤：</strong>3 題在 11/1 說「来月」卻指 11 月的預定，已改成「今月」；另有 2 個日期與日間照護的星期衝突、1 個年齡算錯，都已修正。</li>
+          <li><strong>指南修訂：</strong>兩次標註主要的分歧是背景事實該給 1 分還是 0 分。指南改成 1 分只給同一件事的舊版本、感受、其他步驟、治療所針對的狀況或部分回答，並依此重新檢查全部標註，把 25 筆背景事實改成 0 分。</li>
+          <li><strong>限制：</strong>兩次標註都是 Claude，不是日文母語者，κ 可能偏高。</li>
+        </ul>
+        <p>詳細的裁決與審閱紀錄見 <code>docs/annotation_review.md</code>。</p>
+        <dl class="outcome">
+          <div><dt>狀態</dt><dd>驗收項目全部達成：標註指南完成；25% 樣本完成第二次獨立標註且 κ 0.90 ≥ 0.7；日文經審閱，問題與修改都有紀錄；已切分開發集與測試集。</dd></div>
         </dl>
       </article>
 
@@ -988,7 +1038,7 @@ ruri-v3-130m:
         </ul>
         <dl class="outcome">
           <div><dt>驗收</dt><dd>單一與組合過濾的結果都與 <code>ExactStore</code> 一致；<strong><code>person_id</code> 過濾 100% 不跨人</strong>（含屬性測試）；無結果與 <code>event_date</code> 為空時，行為符合文件；分別記錄 HNSW 相對於精確搜尋的 Recall。</dd></div>
-          <div><dt>手動測試</dt><dd><code>memrag search "..." --person p001 --type event --from 2026-01-01 --to 2026-06-30</code></dd></div>
+          <div><dt>手動測試</dt><dd><code>memrag search "..." --person p001 --category event --from 2026-01-01 --to 2026-06-30</code></dd></div>
         </dl>
       </article>
 
@@ -1055,6 +1105,7 @@ ruri-v3-130m:
           <li>雲端 LLM 的延遲另外標示，不與本地運算混算</li>
           <li>量不到的欄位記為 <code>N/A</code>（不是 0）</li>
         </ul>
+        <p><strong>適用範圍（D2）：</strong>正式部署在自架伺服器，Nano 上的數字只用來比較模型之間的相對差異與找出瓶頸階段。部署伺服器確定後，用同一套 <code>memrag profile</code> 在伺服器上重跑，得到正式數字。</p>
         <dl class="outcome">
           <div><dt>驗收</dt><dd>各階段耗時加總與端到端總耗時差距 &lt; 5%；Profiler 開銷經量測並記錄；報告明確列出瓶頸階段。</dd></div>
           <div><dt>手動測試</dt><dd><code>memrag profile --config configs/experiments/smoke.yaml</code>，或 <code>memrag ask ... --trace</code></dd></div>
@@ -1074,7 +1125,7 @@ ruri-v3-130m:
             <tr><td>模型</td><td>5.1.2 入選的 4–6 個</td></tr>
             <tr><td>裝置</td><td>CUDA 為主；綜合前 2 名另測 CPU，作為備援參考</td></tr>
             <tr><td>搜尋方式</td><td>Exact（比較模型品質）、HNSW（評估實際部署）</td></tr>
-            <tr><td>過濾</td><td>無過濾、<code>person_id</code>、<code>person_id</code> + <code>date</code>/<code>type</code></td></tr>
+            <tr><td>過濾</td><td>無過濾、<code>person_id</code>、<code>person_id</code> + <code>date</code>/<code>category</code></td></tr>
             <tr><td>分組</td><td>Query 類別、候選數（2、5、10、50、該人全部記憶）</td></tr>
           </tbody>
         </table></div>
@@ -1112,7 +1163,7 @@ ruri-v3-130m:
         <h4>公平性控制</h4>
         <ul>
           <li>統一 <code>max_seq_length</code>（上限 512，確認語料不被截斷）</li>
-          <li>所有向量做 L2 正規化；所有模型統一使用 float32</li>
+          <li>所有向量做 L2 正規化；所有模型統一使用 float32（5.1.2 載入量測時 Qwen3 用的是 bfloat16，指標測試要改用 float32）</li>
           <li>語料已凍結，指標測試不載入 LLM，記憶體只反映 Embedding 與向量庫；兩者並存的情況由 5.1.7 量測</li>
           <li>每個模型套用模型卡規定的 prefix，並寫入 manifest</li>
           <li>先用 <code>smoke.yaml</code> 預估時間，再啟動完整矩陣</li>
@@ -1120,6 +1171,17 @@ ruri-v3-130m:
         <dl class="outcome">
           <div><dt>驗收</dt><dd>指標函式通過手算案例，並與第三方函式庫（如 <code>ranx</code>）交叉驗證；完整矩陣都有結果或明確的失敗原因；每筆 Query 都能下鑽查看各模型結果；結果已寫入網頁的測試結果分頁。</dd></div>
           <div><dt>手動測試</dt><dd>UI 的 Compare 分頁、<code>memrag eval --query &lt;id&gt; --explain</code></dd></div>
+        </dl>
+        <h4>預評估：以 Gold Facts 當記憶庫（2026-11-07 加入）</h4>
+        <p>使用者決定先測 Embedding 模型，不等 5.1.4 的 LLM 總結。做法是把 400 筆 Gold Facts 的原文直接當記憶庫，這相當於「總結完全正確」的理想情況，結果只反映 Embedding 模型本身。只用開發集，測試集保留到正式評估。</p>
+        <ul>
+          <li>指令：<code>memrag eval run --models all --split dev</code>；所有模型 float32、精確 cosine 搜尋</li>
+          <li>三種搜尋範圍：不過濾（20 人共 400 筆）、只搜本人、本人加題目的日期／類別過濾</li>
+          <li>指標：nDCG@10、Recall@k、MRR@10，以及 Bootstrap 95% 信賴區間與逐題配對比較；無答案題只算第一名分數的 AUC，正式的閾值指標之後再做</li>
+          <li>5.1.4 完成後，用 LLM 總結出的記憶再跑一次，比較兩者的排名是否一致</li>
+        </ul>
+        <dl class="outcome">
+          <div><dt>狀態</dt><dd>預評估完成（run_id <code>20261107-221101_retrieval_eval</code>）。只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge-base-zh-v1.5 0.780；前四名信賴區間重疊。指標函式通過手算案例，與 <code>ranx</code> 的交叉驗證、閾值校準、HNSW 與測試集評估還沒做。</dd></div>
         </dl>
       </article>
 
@@ -1129,17 +1191,17 @@ ruri-v3-130m:
           <h3>Result Analysis &amp; Embedding Model Selection</h3>
         </div>
         <h4>兩階段決策（<code>selection.yaml</code>，數值暫定，開跑前凍結）</h4>
-        <p><strong>第一階段，硬性門檻：</strong>授權符合 D3；Embedding 加向量庫的系統記憶體增量 ≤ 3 GiB（總量 7.3 GiB 扣除系統與約 2 GB LLM 後的餘裕）；Query P95 ≤ 500 ms（依 D2 調整）；<code>person_id</code> 過濾無跨人錯誤；小候選集（2–10 筆）的無答案誤召回率，在測試集的 95% 信賴區間下限 ≤ 5%。</p>
-        <p><strong>第二階段，加權排名：</strong></p>
+        <p><strong>第一階段，硬性門檻：</strong>授權符合 D3；<code>person_id</code> 過濾無跨人錯誤；小候選集（2–10 筆）的無答案誤召回率，在測試集的 95% 信賴區間下限 ≤ 5%。記憶體與延遲的上限依部署伺服器規格（D10）訂定；規格確定前暫用 Query P95 ≤ 500 ms、Embedding 加向量庫的記憶體 ≤ 3 GiB，以 Nano 數字判斷。</p>
+        <p><strong>第二階段，加權排名（2026-11-07 依 D2 調整）：</strong>正式環境是自架伺服器，資源比 Nano 寬裕，所以提高檢索品質的比重、降低延遲與記憶體的比重；索引建置時間只在資料寫入時發生，改為只回報、不計分。</p>
         <div class="table-wrap"><table>
-          <thead><tr><th>面向</th><th class="num">權重</th></tr></thead>
+          <thead><tr><th>面向</th><th class="num">權重</th><th class="num">調整前</th></tr></thead>
           <tbody>
-            <tr><td>nDCG@10</td><td class="num">35%</td></tr>
-            <tr><td>Recall@5</td><td class="num">20%</td></tr>
-            <tr><td>小候選集（2–10 筆）正確記憶誤擋率，越低越好</td><td class="num">15%</td></tr>
-            <tr><td>Query Latency</td><td class="num">15%</td></tr>
-            <tr><td>記憶體</td><td class="num">10%</td></tr>
-            <tr><td>Index Build Time</td><td class="num">5%</td></tr>
+            <tr><td>nDCG@10</td><td class="num">40%</td><td class="num">35%</td></tr>
+            <tr><td>Recall@5</td><td class="num">25%</td><td class="num">20%</td></tr>
+            <tr><td>小候選集（2–10 筆）正確記憶誤擋率，越低越好</td><td class="num">20%</td><td class="num">15%</td></tr>
+            <tr><td>Query Latency</td><td class="num">10%</td><td class="num">15%</td></tr>
+            <tr><td>記憶體</td><td class="num">5%</td><td class="num">10%</td></tr>
+            <tr><td>Index Build Time</td><td class="num">不計分</td><td class="num">5%</td></tr>
           </tbody>
         </table></div>
         <p><strong>決策規則：</strong>前幾名差距未達顯著時，選擇較輕量、授權較單純的模型。</p>
@@ -1191,19 +1253,20 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     <section id="report">
       <h2>9 測試結果網頁</h2>
       <p><strong>位置：</strong>不另外開網站，直接在現有的計畫書網頁新增分頁。網頁分成「計畫書」和「測試結果」兩個分頁，「測試結果」頂端用一個下拉選單切換每一次的主題。</p>
-      <h3>紀錄規則（每一次都要記）</h3>
+      <p><strong>用途：</strong>在週會報告實驗結果，所以只放模型比較、準確度、效能與選型結論，不放每一個操作步驟（2026-11-07 使用者決定）。</p>
+      <h3>紀錄規則</h3>
       <ul>
-        <li><strong>範圍：</strong>模型查找與調查、環境檢查、自動測試、手動測試、Profiling、指標評估、選型分析都要記錄。正式執行每次新增一筆，重跑也算新的一筆。</li>
-        <li><strong>開發中重複的測試：</strong>開發時反覆跑的單元測試或檢查，依主題合併成一筆，保留執行次數、最後結果和曾出現的失敗。</li>
-        <li><strong>不挑結果：</strong>失敗、中止、不符預期的結果都要記，並寫明原因。</li>
+        <li><strong>放上網頁：</strong>模型調查與篩選、模型效能量測、檢索指標評估、選型分析。每次正式實驗一筆，重跑也算新的一筆。</li>
+        <li><strong>不放上網頁：</strong>環境檢查、開發中的自動測試、模型下載、手動測試、修 bug 的過程。需要追查時看 git 紀錄與 <code>results/runs/</code>。2026-11-07 以前已寫的 15 筆過程紀錄移到 <code>reports/log/</code> 存檔，之後不再新增。</li>
+        <li><strong>不挑結果：</strong>實驗結果不好、中途失敗或發現問題，都要寫在該次實驗紀錄裡並說明原因，例如模型因相容性問題被移出。</li>
         <li><strong>只增不改：</strong>舊紀錄不覆寫。發現錯誤時新增一筆修正紀錄，並和原紀錄互相連結。</li>
-        <li><strong>完成條件：</strong>紀錄寫入、網頁更新、同步到 Nano 都做完，這次測試才算完成。</li>
+        <li><strong>完成條件：</strong>紀錄寫入、總覽的模型比較表更新、網頁發布、同步到 Nano 都做完，這次實驗才算完成。</li>
         <li><strong>內容限制：</strong>不放密碼、API Key 或真實個資。</li>
       </ul>
       <h3>下拉選單</h3>
       <ul>
-        <li><strong>第一項「總覽」：</strong>任務進度 5.1.1–5.1.9、通過／失敗統計、目前選型結論、全部紀錄清單。</li>
-        <li><strong>其他項目：</strong>依任務分組，最新的在前，每項顯示 <code>日期｜主題｜狀態</code>，例如 <code>2026-11-06｜Nano 環境與 GPU 檢查｜資訊</code>。</li>
+        <li><strong>第一項「總覽」：</strong>給週會直接使用：目前選型結論、本期重點、模型比較總表、下一步、任務進度、實驗紀錄清單。</li>
+        <li><strong>其他項目：</strong>依任務分組，最新的在前，每項顯示 <code>日期｜主題｜狀態</code>，例如 <code>2026-11-07｜模型載入量測與首輪名單｜通過</code>。</li>
         <li><strong>直接連結：</strong>網址帶紀錄 ID（<code>#record=&lt;id&gt;</code>），可以直接分享某一筆。</li>
       </ul>
       <h3>每筆紀錄的內容</h3>
@@ -1225,10 +1288,8 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
         <thead><tr><th>類型</th><th>結果內容</th><th>主要資料來源</th></tr></thead>
         <tbody>
           <tr><td>模型調查</td><td>模型大小、維度、授權、prefix、JMTEB 分數、篩選理由</td><td>模型卡、MTEB Leaderboard</td></tr>
-          <tr><td>環境檢查</td><td>硬體、版本、記憶體與磁碟、檢查項目結果</td><td><code>memrag env check</code></td></tr>
-          <tr><td>自動測試</td><td>通過／失敗／跳過、失敗訊息、覆蓋率</td><td>JUnit、coverage</td></tr>
-          <tr><td>手動測試</td><td>測試項目、預期與實際結果、測試者</td><td>manual JSON</td></tr>
-          <tr><td>Profiling</td><td>各階段延遲與記憶體圖表、瓶頸標示</td><td><code>profile.jsonl</code></td></tr>
+          <tr><td>模型篩選</td><td>入選或移出的理由與證據，例如相容性檢查</td><td>實測輸出</td></tr>
+          <tr><td>效能量測</td><td>各模型或各階段的延遲與記憶體、瓶頸標示</td><td><code>load_probe.jsonl</code>、<code>profile.jsonl</code></td></tr>
           <tr><td>指標評估</td><td>指標總表、信賴區間、Recall@k 曲線、分組分析、閾值與小候選集結果、單筆 Query 下鑽</td><td><code>metrics.json</code>、<code>per_query.jsonl</code></td></tr>
           <tr><td>選型分析</td><td>門檻結果、加權排名、敏感度分析、ADR 連結</td><td>selection</td></tr>
         </tbody>
@@ -1241,21 +1302,18 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
 → 發布到同一個網址 → nano_sync.ps1 同步到 Nano</code></pre>
       <ul>
         <li><strong>沒有 <code>run_id</code> 的紀錄：</strong>模型調查這類工作用 <code>memrag report add --type survey --from &lt;檔案&gt;</code> 新增。</li>
-        <li><strong>Library 完成前：</strong>5.1.2 做出 <code>memrag report</code> 之前，紀錄手動新增，再用 <code>scripts/build_results_tab.ps1</code> 寫入網頁。</li>
+        <li><strong><code>memrag report</code> 做好之前：</strong>紀錄與 <code>overview.json</code> 手動維護，再用 <code>scripts/build_results_tab.ps1</code> 寫入網頁。</li>
         <li><strong>一鍵流程：</strong>Nano 上的 <code>scripts/run_all.sh</code> 依序執行 <code>pytest</code>、<code>memrag profile</code>、<code>memrag eval</code>，結果再照上面的流程處理。</li>
         <li><strong>離線與權限：</strong><code>docs/project_plan.html</code> 的資料都內嵌在檔案內，雙擊就能離線開啟；只有流程圖要連網載入，離線時會顯示原始文字。線上網頁預設是私人的，要從 Share 開放權限，其他人才能看。</li>
         <li><strong>檔案大小：</strong>線上網頁上限 16 MB。建置時檢查大小，超過 12 MB 就把較舊紀錄的單筆 Query 明細移出網頁，改成指向 <code>results/</code> 的路徑；<code>reports/records/</code> 的紀錄本身不變。</li>
       </ul>
-      <h3>首批補登（2026-11-07 已放上網頁）</h3>
+      <h3>目前網頁上的實驗（2026-11-07）</h3>
       <div class="table-wrap"><table>
         <thead><tr><th>日期</th><th>主題</th><th>類型</th><th>任務</th></tr></thead>
         <tbody>
-          <tr><td class="nowrap">2026-11-06</td><td>初步候選模型卡查閱</td><td>模型調查</td><td>5.1.1</td></tr>
-          <tr><td class="nowrap">2026-11-06</td><td>Nano 環境與 GPU 檢查</td><td>環境檢查</td><td>5.1.2</td></tr>
-          <tr><td class="nowrap">2026-11-06</td><td>aarch64 套件相容性解析</td><td>環境檢查</td><td>5.1.2</td></tr>
-          <tr><td class="nowrap">2026-11-07</td><td>Nano 模型盤點與 Gemma 刪除</td><td>環境檢查</td><td>5.1.2</td></tr>
-          <tr><td class="nowrap">2026-11-07</td><td>README 覆蓋檢查與 Nano 同步驗證</td><td>環境檢查</td><td>5.1.2</td></tr>
-          <tr><td class="nowrap">2026-11-07</td><td>Prompt 格式與變數檢查</td><td>自動測試</td><td>5.1.4</td></tr>
+          <tr><td class="nowrap">2026-11-07</td><td>候選 Embedding 模型調查</td><td>模型調查</td><td>5.1.1</td></tr>
+          <tr><td class="nowrap">2026-11-07</td><td>模型載入量測與首輪名單</td><td>效能量測</td><td>5.1.2</td></tr>
+          <tr><td class="nowrap">2026-11-07</td><td>GLuCoSE 與 transformers 5 相容性檢查</td><td>模型篩選</td><td>5.1.2</td></tr>
         </tbody>
       </table></div>
     </section>
@@ -1284,6 +1342,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
           <tr><td>模型或依賴更新導致結果變動</td><td>無法重現</td><td>固定 revision、<code>uv.lock</code>、manifest</td></tr>
           <tr><td>看到結果後調整標準</td><td>選型偏誤</td><td>門檻、權重與測試集開跑前提交版控</td></tr>
           <tr><td>公開榜單資料與本專案情境不同</td><td>誤判候選</td><td>JMTEB 僅用於篩選參考，最終以本專案測試為準</td></tr>
+          <tr><td>測試平台（Nano）與部署伺服器不同</td><td>延遲、記憶體數字不能直接套用到正式環境</td><td>選型以檢索品質為主；效能只比較模型間的相對差異；部署伺服器確定後重跑 <code>memrag profile</code>（D2、D10）</td></tr>
         </tbody>
       </table></div>
     </section>
@@ -1296,7 +1355,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
         <li><span>他人可依 <code>README.md</code> 從全新環境完成安裝並跑通冒煙測試</span></li>
         <li><span>Library、CLI、手動測試 UI 三種入口都可完成 Embed、Search、Ask</span></li>
         <li><span><code>manual_testing.md</code> 由非開發者實際操作驗證過一次</span></li>
-        <li><span>每一次測試與模型調查都有紀錄，可從測試結果分頁的下拉選單查看，包含失敗與中止的結果</span></li>
+        <li><span>每一次實驗（模型調查與篩選、效能量測、指標評估、選型分析）都有紀錄，可從測試結果分頁的下拉選單查看，包含結果不佳或中止的實驗</span></li>
         <li><span>Nano 上的 <code>run_all.sh</code> 可一鍵跑完測試與評估，結果取回 Windows 後可更新網頁，網頁也能離線開啟</span></li>
         <li><span>專案結束時 Nano 上只新增 <code>~/50019/rag_test</code>；暫停的服務都已重啟；除 D9 已刪除的模型外，未更動其他專案、服務或系統設定</span></li>
         <li><span>選型報告與 ADR 完成，數字都可追溯到 <code>run_id</code></span></li>
@@ -1316,7 +1375,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
         <p><a href="https://docs.trychroma.com/docs/querying-collections/metadata-filtering">Chroma Metadata Filtering</a></p>
         <p>Jetson PyTorch（社群資料有分歧，本計畫以 Nano 實測結果為準）：<a href="https://forums.developer.nvidia.com/t/how-do-i-correctly-install-pytorch-on-jetpack-7-2/372773">JetPack 7.2 安裝討論</a>、<a href="https://github.com/iuliaferoli/jetson-jp7.2-install">jetson-jp7.2-install</a>、<a href="https://johnnynunez.github.io/projects/jetson-sbsa-pytorch">Jetson SBSA PyTorch Wheels</a></p>
       </div>
-      <p class="foot">本頁內容對應 <code>PROJECT_PLAN.md</code> v0.11，門檻與權重均為暫定值，需在 5.1.8 開跑前凍結。</p>
+      <p class="foot">本頁內容對應 <code>PROJECT_PLAN.md</code> v0.14，門檻與權重均為暫定值，需在 5.1.8 開跑前凍結。</p>
     </section>
   </main>
 </div>
@@ -1330,143 +1389,51 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
 </div>
 
 <script id="report-data" type="application/json">{"overview":{
-  "headline": "首輪名單確定，還沒有檢索品質的結果",
-  "summary": "5.1.2 已在 Nano 上載入 5 個候選和 1 個對照組，並量測載入時間、記憶體與單句延遲，全部在門檻內。Recall、MRR、nDCG 等檢索指標要等 5.1.3–5.1.8 建好資料後才有。",
-  "conclusion": "尚未選型。首輪候選為 ruri-v3-30m、ruri-v3-130m、ruri-v3-310m、Qwen3-Embedding-0.6B、multilingual-e5-small，產品現用的 bge-base-zh-v1.5 當對照組；GLuCoSE 因 transformers 5 不相容而移出。",
+  "headline": "首次準確度結果：ruri 系列最好，產品現用的 bge 明顯最差",
+  "summary": "把 400 筆標準事實直接當記憶庫，用開發集 81 題測 6 個模型，只比較 Embedding 本身。只搜本人時，ruri-v3-310m 的 nDCG@10 最高（0.945），ruri-v3-30m 與 Qwen3 和它的差距不顯著；產品現用的 bge-base-zh-v1.5 只有 0.780。這是初步結果：還沒用 LLM 總結出來的記憶，也還沒用測試集。",
+  "conclusion": "尚未選型。初步排名：ruri-v3-310m ≥ ruri-v3-30m ≈ Qwen3-Embedding-0.6B ≈ ruri-v3-130m > multilingual-e5-small > bge-base-zh-v1.5（對照組）。",
+  "findings": [
+    "只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge 0.780；前四名的信賴區間重疊，還要更多資料才分得出來。",
+    "差距最大的是表記差異題（漢字、平假名、簡稱）：ruri-v3-130m／310m 約 0.96，bge 只有 0.66。",
+    "不加 person_id 過濾時，26%–49% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
+    "時間與類別的問題只靠 Embedding 找不到（nDCG@10 0.04–0.25），套上日期／類別過濾後 6 個模型都是 1.0；這類問題要靠 metadata。",
+    "效能上 6 個模型在 Nano GPU 的單句延遲都在 84 ms 內，記憶體峰值都在 1.7 GiB 內；ruri-v3-30m 速度最快，準確度和 310m 的差距不顯著，是輕量的選項。"
+  ],
+  "comparison": {
+    "caption": "模型比較總表（2026-11-07）",
+    "columns": ["模型", "角色", "nDCG@10（只搜本人）", "Recall@5", "表記差異題 nDCG", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
+    "numeric": [2, 3, 4, 5, 6, 7, 8],
+    "rows": [
+      ["ruri-v3-310m", "候選", "0.945", "0.968", "0.956", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
+      ["ruri-v3-30m", "候選", "0.931", "0.948", "0.874", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
+      ["Qwen3-Embedding-0.6B", "候選", "0.921", "0.945", "0.852", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
+      ["ruri-v3-130m", "候選", "0.920", "0.964", "0.963", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
+      ["multilingual-e5-small", "候選", "0.871", "0.899", "0.714", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
+      ["bge-base-zh-v1.5", "對照組（產品現用）", "0.780", "0.849", "0.664", "—", "20.0 ms", "734 MiB", "104.6 ms"]
+    ],
+    "note": "準確度：開發集 73 題有答案的問題，記憶庫是 400 筆標準事實原文，只搜該使用者的記憶，精確搜尋；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
+  },
+  "next": [
+    "5.1.4：用 Qwen3-1.7B 產生模擬對話並總結成記憶 JSON，用相同評估看真實總結下排名是否改變。",
+    "5.1.8：閾值校準與小候選集誤擋率；最後用測試集 120 題做正式評估。"
+  ],
   "tasks": [
-    { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成；列出調查表的 CLI 尚未做" },
-    { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：環境、registry、CLI、載入量測、首輪名單" },
-    { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "尚未開始" },
-    { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "尚未開始，只有 prompt 草稿" },
-    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始；ChromaDB 已通過讀寫檢查" },
+    { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成" },
+    { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：首輪名單與效能量測" },
+    { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "完成：201 題測試問題與標準答案，κ 0.90" },
+    { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "尚未開始" },
+    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（這次先用精確搜尋）" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
-    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "尚未開始" },
+    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "進行中：開發集初步結果（標準事實當記憶庫）" },
     { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "尚未開始" }
   ]
 }
-,"records":[{"id":"2026-11-06_aarch64-package-resolve","record":{
-  "title": "aarch64 套件相容性解析",
-  "date": "2026-11-06",
-  "task": "5.1.2",
-  "type": "環境檢查",
-  "status": "資訊",
-  "backfilled": true,
-  "purpose": "主要套件有沒有 aarch64 版本可以安裝？",
-  "environment": ["robo@172.28.0.147，uv 0.12.19"],
-  "method": ["用 uv 解析相依套件，沒有實際安裝"],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["套件", "版本", "結果"],
-      "rows": [
-        ["chromadb", "1.5.9", "可解析到 aarch64 wheel"],
-        ["sentence-transformers", "6.2.0", "可解析到 aarch64 wheel"]
-      ]
-    }
-  ],
-  "conclusion": ["只確認可解析，不代表能正常執行。"],
-  "next": ["5.1.2 實際安裝並通過讀寫測試。"],
-  "sources": [{ "text": "計畫書第 2.1 節" }],
-  "related": []
-}
-},{"id":"2026-11-06_initial-model-card-check","record":{
-  "title": "初步候選模型卡查閱",
-  "date": "2026-11-06",
-  "task": "5.1.1",
-  "type": "模型調查",
-  "status": "資訊",
-  "backfilled": true,
-  "purpose": "寫計畫書時，先列出可能的日文 Embedding 候選。",
-  "environment": ["Windows 開發機查閱公開模型卡", "run_id、資料 hash：N/A"],
-  "method": ["查閱 8 個模型家族的模型卡，整理大小、維度、授權與 prefix 規則"],
-  "results": [
-    {
-      "kind": "list",
-      "items": [
-        "列出 ruri-v3、GLuCoSE v2、RoSEtta、PLaMo、Sarashina v1、e5-small、BGE-M3、EmbeddingGemma，共 10 個模型",
-        "部分欄位當時未確認，在計畫書標為待確認",
-        "PLaMo 和 Sarashina 的權重當時估計各約 4 GB，首輪排除"
-      ]
-    },
-    {
-      "kind": "note",
-      "title": "已修正",
-      "text": "PLaMo 的權重實際約 2.0 GiB，估計有誤。Sarashina 實際約 4.6 GiB。正確資料見 2026-11-07 的候選模型調查。"
-    }
-  ],
-  "conclusion": ["只是初步清單，不能當作選型依據。"],
-  "next": ["由 5.1.1 正式調查複核。"],
-  "sources": [{ "text": "計畫書 v0.1–v0.9 的 5.1.1 初步候選表" }],
-  "related": [{ "id": "2026-11-07_model-survey", "relation": "這筆紀錄的修正" }]
-}
-},{"id":"2026-11-06_nano-env-gpu-check","record":{
-  "title": "Nano 環境與 GPU 檢查",
-  "date": "2026-11-06",
-  "task": "5.1.2",
-  "type": "環境檢查",
-  "status": "資訊",
-  "backfilled": true,
-  "purpose": "Jetson Orin Nano 能不能用 GPU 跑 PyTorch？硬體資源有多少？",
-  "environment": ["robo@172.28.0.147", "使用其他專案現有環境的 torch 2.15.0+cu132，本專案環境尚未建立"],
-  "method": ["透過 SSH 查看硬體、系統、記憶體與磁碟", "在現有 PyTorch 環境實跑 512×512 矩陣乘法"],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["機型", "Jetson Orin Nano Super，MAXN_SUPER"],
-        ["系統", "Ubuntu 24.04.5、L4T R39.2.1、aarch64"],
-        ["CPU", "6 核 Cortex-A78AE"],
-        ["記憶體", "7.3 GiB，CPU 與 GPU 共用，無 Swap"],
-        ["可用記憶體", "常駐服務執行時約 2.7 GiB"],
-        ["GPU", "CUDA 13.2；nvidia-smi 讀不到記憶體"],
-        ["PyTorch", "CUDA 可用，矩陣乘法成功"]
-      ]
-    }
-  ],
-  "conclusion": ["GPU 可用。記憶體是主要限制，量測時要暫停常駐服務（D8）。"],
-  "next": ["5.1.2 在本專案建立獨立環境後重新驗證。"],
-  "sources": [{ "text": "計畫書第 2.1 節" }],
-  "related": []
-}
-},{"id":"2026-11-07_glucose-delete","record":{
-  "title": "GLuCoSE 模型檔刪除",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "環境檢查",
-  "status": "通過",
-  "backfilled": false,
-  "purpose": "依使用者指示刪除已移出名單的 GLuCoSE 模型檔，且不影響其他模型。",
-  "environment": ["robo@172.28.0.147，~/50019/rag_test/.hf_cache（本專案自己的快取）"],
-  "method": [
-    "找出 GLuCoSE 快照指向的檔案，與其他 6 個模型指向的檔案比對",
-    "只刪除 GLuCoSE 獨有的檔案與它的模型資料夾",
-    "刪除後執行 memrag models list，並檢查有沒有失效的連結"
-  ],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["GLuCoSE 檔案", "13 個，都沒有和其他模型共用"],
-        ["釋放空間", "508 MiB；磁碟剩餘從 9.2 GB 增加到 9.7 GB"],
-        ["其他模型", "6 個都仍顯示已下載，沒有失效的連結"]
-      ]
-    }
-  ],
-  "conclusion": ["GLuCoSE 已從 Nano 移除；之後要用的話需重新下載並另建 transformers 4.x 環境。"],
-  "next": [],
-  "sources": [{ "text": "configs/models.yaml 的移出註記" }],
-  "related": [
-    { "id": "2026-11-07_glucose-transformers-compat", "relation": "移出原因；該紀錄寫的「暫時保留」已由本紀錄更新" }
-  ]
-}
-},{"id":"2026-11-07_glucose-transformers-compat","record":{
+,"records":[{"id":"2026-11-07_glucose-transformers-compat","record":{
   "title": "GLuCoSE 與 transformers 5 相容性檢查",
   "date": "2026-11-07",
   "task": "5.1.2",
-  "type": "環境檢查",
+  "type": "模型篩選",
   "status": "失敗",
   "backfilled": false,
   "purpose": "GLuCoSE-base-ja-v2 能不能和其他模型共用同一個 transformers 版本？",
@@ -1510,7 +1477,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   "title": "模型載入量測與首輪名單",
   "date": "2026-11-07",
   "task": "5.1.2",
-  "type": "Profiling",
+  "type": "效能量測",
   "status": "通過",
   "backfilled": false,
   "purpose": "5 個候選與對照組在 Nano 的 CUDA 與 CPU 上能不能載入？載入時間、記憶體和單句延遲是多少？",
@@ -1590,122 +1557,6 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "2026-11-07_load-probe-run1", "relation": "第 1 次因程式錯誤失敗" },
     { "id": "2026-11-07_glucose-transformers-compat", "relation": "GLuCoSE 移出原因" }
   ]
-}
-},{"id":"2026-11-07_load-probe-run1","record":{
-  "title": "模型載入量測（第 1 次，程式錯誤）",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "Profiling",
-  "status": "失敗",
-  "backfilled": false,
-  "purpose": "7 個模型在 CUDA 與 CPU 上的載入時間、記憶體與延遲是多少？",
-  "environment": [
-    "robo@172.28.0.147，run_id 20261107-181738_load_probe",
-    "llama-server 與 pocket_tts_server 由 nano_measure.sh 停止（18:17–18:28，含之後的 pytest），結束後重啟並確認可連線"
-  ],
-  "method": ["uv run memrag models probe --devices cuda,cpu，每個模型與裝置各一個子行程"],
-  "results": [
-    {
-      "kind": "p",
-      "text": "14 組全部失敗，錯誤相同：TypeError: 'Event' object is not callable。"
-    },
-    {
-      "kind": "note",
-      "title": "原因",
-      "text": "記憶體取樣執行緒把停止旗標命名為 _stop，蓋掉了 Python Thread 內建的同名方法，所以結束取樣時當掉。從耗時看，模型載入和延遲量測都已跑完，是收尾時才失敗。"
-    }
-  ],
-  "conclusion": ["量測程式的錯誤，與模型無關，沒有可用數據。"],
-  "next": ["改名為 _done，補單元測試後重跑。"],
-  "sources": [{ "text": "results/runs/20261107-181738_load_probe/" }],
-  "related": [
-    { "id": "2026-11-07_load-probe", "relation": "修正後重跑" }
-  ]
-}
-},{"id":"2026-11-07_manual-embed-check","record":{
-  "title": "手動測試：memrag embed --explain",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "手動測試",
-  "status": "通過",
-  "backfilled": false,
-  "purpose": "5.1.2 的手動測試指令能不能用真實模型執行，並顯示實際送進模型的文字？",
-  "environment": [
-    "robo@172.28.0.147，常駐服務執行中",
-    "測試者：Claude（依 docs/manual_testing.md 的 5.1.2 章節）"
-  ],
-  "method": [
-    "uv run memrag embed テスト --model ruri-v3-130m --kind query --explain",
-    "同一指令改用 qwen3-emb-0.6b",
-    "uv run memrag embed テスト --model nope"
-  ],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "預期", "實際"],
-      "rows": [
-        ["ruri-v3-130m", "512 維、長度 1、文字前加「検索クエリ: 」", "符合"],
-        ["qwen3-emb-0.6b", "1024 維、長度 1、文字前加 Instruct 指令", "符合，Query: 後面沒有空格，與官方寫法相同"],
-        ["不存在的模型", "列出可用模型並以結束碼 2 結束", "符合"]
-      ]
-    },
-    {
-      "kind": "note",
-      "title": "單次指令的耗時",
-      "text": "單次執行的載入約 23–25 秒、第一次向量化 1.8–3.5 秒，包含 import 與第一次 CUDA 初始化，又沒有暖機，所以比載入量測的數字慢很多。延遲以載入量測紀錄為準。"
-    }
-  ],
-  "conclusion": ["手動測試指令可用，prefix 顯示正確。"],
-  "next": [],
-  "sources": [{ "text": "docs/manual_testing.md" }],
-  "related": [
-    { "id": "2026-11-07_load-probe", "relation": "暖機後的延遲數字" }
-  ]
-}
-},{"id":"2026-11-07_model-download","record":{
-  "title": "候選模型下載（固定 revision）",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "環境檢查",
-  "status": "通過",
-  "backfilled": false,
-  "purpose": "7 個模型能不能以固定的 commit hash 下載到專案自己的快取，且不超過磁碟預算？",
-  "environment": [
-    "robo@172.28.0.147，HF_HOME 指向 ~/50019/rag_test/.hf_cache，不用共用快取",
-    "revision 查詢日 2026-11-07，記錄在 configs/models.yaml"
-  ],
-  "method": [
-    "uv run memrag models download",
-    "略過 ONNX、OpenVINO、評測結果檔；e5-small 另略過重複的 pytorch_model.bin"
-  ],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["模型", "revision", "大小"],
-      "rows": [
-        ["ruri-v3-30m", "24899e5d", "149 MiB"],
-        ["ruri-v3-130m", "e3114c6e", "513 MiB"],
-        ["ruri-v3-310m", "18b60fb8", "1.2 GiB"],
-        ["GLuCoSE-base-ja-v2", "a6cbdf4d", "509 MiB（之後移出名單）"],
-        ["Qwen3-Embedding-0.6B", "97b0c614", "1.2 GiB"],
-        ["multilingual-e5-small", "614241f6", "471 MiB"],
-        ["bge-base-zh-v1.5（對照組）", "f03589ce", "391 MiB"]
-      ]
-    },
-    {
-      "kind": "p",
-      "text": "模型快取共 4.3 GiB。e5-small 略過的 ONNX、OpenVINO 檔約 1.3 GB。"
-    },
-    {
-      "kind": "note",
-      "title": "下載中 Windows 的 SSH 連線被中止",
-      "text": "Windows 記憶體不足，Claude Code 停掉了本機的 SSH 連線，但 Nano 上的下載程式繼續執行並正常完成。之後的量測都改用 nohup 在 Nano 背景執行。"
-    }
-  ],
-  "conclusion": ["7 個模型都已下載並固定 revision，之後以離線模式載入。"],
-  "next": ["量測 CUDA 與 CPU 載入。"],
-  "sources": [{ "text": "configs/models.yaml" }],
-  "related": []
 }
 },{"id":"2026-11-07_model-survey","record":{
   "title": "候選 Embedding 模型調查",
@@ -1801,307 +1652,98 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "2026-11-06_initial-model-card-check", "relation": "修正這筆紀錄的 PLaMo 權重估計" }
   ]
 }
-},{"id":"2026-11-07_nano-contract-tests","record":{
-  "title": "Nano 完整測試（含真實模型）",
+},{"id":"2026-11-07_retrieval-eval-gold-dev","record":{
+  "title": "首次準確度評估：標準事實當記憶庫（開發集）",
   "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "自動測試",
-  "status": "通過",
+  "task": "5.1.8",
+  "type": "指標評估",
+  "status": "部分完成",
   "backfilled": false,
-  "purpose": "修正 Qwen3 正規化並移出 GLuCoSE 後，包含真實模型的全部測試能不能通過？",
+  "purpose": "在還沒有 LLM 總結的記憶之前，先只比較 Embedding 模型本身：把 400 筆標準事實直接當記憶庫，哪個模型最能找到正確的記憶？",
   "environment": [
-    "robo@172.28.0.147，6 個模型已下載",
-    "常駐服務已停止（與載入量測同一個工作階段）"
-  ],
-  "method": ["uv run pytest -q -rs"],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["總計", "111 通過、0 失敗、0 略過，耗時 4 分 12 秒"],
-        ["Prefix 契約", "6 個模型的 prefix 都與 model card 相同；Qwen3 與內建 prompt 相同；實際送進模型的文字確實加上 prefix"],
-        ["EmbeddingProvider 契約", "Fake 與 6 個真實模型都通過：維度、單位長度、可重現、批次與單筆一致、query 與 document 的 prefix 確實生效"],
-        ["架構與其他", "分層規則、README 覆蓋、registry 驗證、ChromaDB 讀寫、CLI 全部通過"]
-      ]
-    }
-  ],
-  "conclusion": ["5.1.2 驗收要求的 Prefix 契約測試通過。"],
-  "next": [],
-  "sources": [{ "text": "tests/" }],
-  "related": [
-    { "id": "2026-11-07_nano-contract-tests-run1", "relation": "第 1 次的失敗與修正" },
-    { "id": "2026-11-07_skeleton-dev-tests", "relation": "Windows 上的開發測試" }
-  ]
-}
-},{"id":"2026-11-07_nano-contract-tests-run1","record":{
-  "title": "Nano 完整測試（第 1 次）",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "自動測試",
-  "status": "失敗",
-  "backfilled": false,
-  "purpose": "包含真實模型的契約測試與 Prefix 契約，在 Nano 上能不能全部通過？",
-  "environment": [
-    "robo@172.28.0.147，7 個模型已下載",
-    "常駐服務已停止（與載入量測第 1 次同一個工作階段）"
-  ],
-  "method": ["uv run pytest -q -rs"],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["總計", "117 通過、2 失敗、6 錯誤、0 略過，耗時 5 分 24 秒"],
-        ["GLuCoSE-base-ja-v2", "7 項失敗或錯誤：tokenizer 無法載入（Unrecognized processing class）"],
-        ["Qwen3-Embedding-0.6B", "1 項失敗：向量長度 1.0013，超過容許誤差 0.001"],
-        ["其他 5 個模型", "全部通過"]
-      ]
-    },
-    {
-      "kind": "note",
-      "title": "Qwen3 的原因",
-      "text": "Qwen3 用 bfloat16 載入，正規化在低精度下進行，長度誤差約 0.1%，會讓 cosine 分數略微偏高。已改成轉為 float32 後再正規化，所有模型適用。"
-    }
-  ],
-  "conclusion": ["Qwen3 是本專案程式的問題，已修正；GLuCoSE 是套件相容性問題，另見相容性檢查紀錄。"],
-  "next": ["修正後在 Nano 重跑。"],
-  "sources": [{ "text": "tests/contract/test_embedding_provider.py" }],
-  "related": [
-    { "id": "2026-11-07_glucose-transformers-compat", "relation": "GLuCoSE 失敗原因" },
-    { "id": "2026-11-07_nano-contract-tests", "relation": "修正後重跑" }
-  ]
-}
-},{"id":"2026-11-07_nano-env-setup","record":{
-  "title": "Nano 專案環境建立與 env check",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "環境檢查",
-  "status": "通過",
-  "backfilled": false,
-  "purpose": "Nano 能不能用 uv sync 從頭建立本專案環境，並通過 memrag env check（含實際 GPU 運算與 ChromaDB 讀寫）？",
-  "environment": [
-    "robo@172.28.0.147，~/50019/rag_test",
-    "Python 3.11.16（uv 管理）；uv.lock 由 Windows 產生，涵蓋兩個平台",
-    "常駐服務執行中，可用記憶體約 2.3 GiB"
+    "robo@172.28.0.147（Jetson Orin Nano，CUDA），run_id 20261107-221101_retrieval_eval",
+    "torch 2.15.0+cu132、transformers 5.22.2、sentence-transformers 6.2.0",
+    "所有模型都用 float32（Qwen3 也從 bfloat16 改成 float32），向量做 L2 正規化，套用模型卡規定的 prefix",
+    "llama-server 與 pocket_tts_server 由 nano_measure.sh 停止（22:10–22:12），結束後重啟並確認 /health 回 200",
+    "git commit：N/A（尚未提交）"
   ],
   "method": [
-    "nano_sync.ps1 同步後執行 uv sync",
-    "uv run memrag env check"
+    "uv run memrag eval run --models all --split dev",
+    "記憶庫：data/00_gold 的 400 筆事實原文（理想的總結結果），不經過 LLM；所以結果只反映 Embedding 模型",
+    "問題：開發集 81 題（有答案 73 題、無答案 8 題）；測試集 120 題保留到最終評估，這次沒有使用",
+    "搜尋：精確 cosine 排序（不用 HNSW），三種範圍：不過濾（20 人共 400 筆）、只搜本人（每人 20 筆）、本人＋題目的日期／類別過濾",
+    "指標：nDCG@10（2 分與 1 分的分級標註）、Recall@1／5、MRR@10；95% 信賴區間用 Bootstrap 2,000 次；與最佳模型的差距用逐題配對 Bootstrap，區間不含 0 才算顯著"
   ],
   "results": [
     {
       "kind": "table",
-      "columns": ["檢查項目", "結果"],
+      "caption": "只搜本人（最接近實際使用：機器人知道在跟誰說話）",
+      "columns": ["模型", "nDCG@10", "95% 信賴區間", "Recall@5", "Recall@1", "MRR@10", "與最佳的差距"],
       "rows": [
-        ["Python", "3.11.16，aarch64"],
-        ["套件", "torch 2.15.0+cu132、transformers 5.22.2、sentence-transformers 6.2.0、chromadb 1.5.9、huggingface-hub 2.4.0、numpy 2.4.6"],
-        ["GPU", "Orin，capability 8.7，CUDA 13.2；512×512 矩陣乘法與 CPU 結果最大差 9.9e-05"],
-        ["ChromaDB", "寫入 3 筆，依 person_id 過濾後查回 m1、m3，筆數正確"],
-        ["磁碟", "uv sync 前後剩餘空間都是 15 GB"]
+        ["ruri-v3-310m", "0.945", "0.912–0.973", "0.968", "0.715", "0.941", "最佳"],
+        ["ruri-v3-30m", "0.931", "0.889–0.964", "0.948", "0.712", "0.944", "−0.013，不顯著"],
+        ["qwen3-emb-0.6b", "0.921", "0.880–0.956", "0.945", "0.669", "0.917", "−0.024，不顯著"],
+        ["ruri-v3-130m", "0.920", "0.881–0.953", "0.964", "0.680", "0.923", "−0.025，顯著"],
+        ["e5-small", "0.871", "0.815–0.922", "0.899", "0.580", "0.859", "−0.074，顯著"],
+        ["bge-base-zh-v1.5（對照組）", "0.780", "0.712–0.842", "0.849", "0.500", "0.781", "−0.164，顯著"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "三種搜尋範圍的 nDCG@10",
+      "columns": ["模型", "不過濾（400 筆）", "只搜本人", "本人＋日期／類別"],
+      "rows": [
+        ["ruri-v3-310m", "0.798", "0.945", "0.976"],
+        ["ruri-v3-30m", "0.764", "0.931", "0.955"],
+        ["ruri-v3-130m", "0.761", "0.920", "0.966"],
+        ["qwen3-emb-0.6b", "0.704", "0.921", "0.952"],
+        ["e5-small", "0.645", "0.871", "0.909"],
+        ["bge-base-zh-v1.5（對照組）", "0.518", "0.780", "0.842"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "只搜本人，依問題類型的 nDCG@10",
+      "columns": ["模型", "直接問", "換句話說", "表記差異", "指定人物", "時間／類別（不套過濾）"],
+      "rows": [
+        ["ruri-v3-310m", "0.997", "0.969", "0.956", "0.969", "0.770"],
+        ["ruri-v3-30m", "0.988", "0.959", "0.874", "0.972", "0.827"],
+        ["ruri-v3-130m", "0.987", "0.967", "0.963", "0.921", "0.666"],
+        ["qwen3-emb-0.6b", "0.995", "0.964", "0.852", "0.965", "0.776"],
+        ["e5-small", "0.970", "0.971", "0.714", "0.926", "0.722"],
+        ["bge-base-zh-v1.5（對照組）", "0.915", "0.803", "0.664", "0.892", "0.551"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "差距最大的是表記差異題（漢字、平假名、簡稱）：ruri-v3-130m／310m 約 0.96，ruri-v3-30m 和 Qwen3 約 0.85–0.87，e5-small 0.71，bge 0.66。",
+        "不加 person_id 過濾時，有 26%–49% 的題目第一名是別人的記憶（ruri-v3-310m 26%、bge 49%）；只搜本人時是 0%。",
+        "時間／類別題只靠 Embedding 很難：不過濾時 nDCG@10 只有 0.04–0.25；套上日期或類別過濾後，6 個模型都是 1.0。",
+        "無答案題的第一名分數比有答案題低的機率（AUC，只搜本人）：ruri-v3-310m 0.94、ruri-v3-130m 0.93、e5-small 0.93、ruri-v3-30m 0.86、Qwen3 0.86、bge 0.85。只有 8 題，僅供參考。"
       ]
     },
     {
       "kind": "note",
-      "title": "環境幾乎不佔磁碟",
-      "text": "uv 快取裡已有其他專案用過的 cp311 torch，安裝時以硬連結重用。.venv 帳面上 5.8 GB，實際沒有增加磁碟用量。"
-    },
-    {
-      "kind": "note",
-      "title": "第一次 GPU 初始化很慢",
-      "text": "env check 的 GPU 項目花了 48 秒，大部分是第一次初始化 CUDA。之後量測時每個模型的載入是 8–21 秒。"
+      "title": "這次結果的限制",
+      "text": "只用開發集，有答案的題目只有 73 題，信賴區間約 ±0.04，前四名的排名還不穩定。記憶庫是事實原文，比實際 LLM 總結出來的記憶更整齊；事實和題目都由 Claude 撰寫，用詞可能比真實對話更接近。還沒有做閾值校準、小候選集誤擋率與 HNSW 搜尋，這些是選型權重的一部分。"
     }
   ],
-  "conclusion": ["驗收的 env check 與 ChromaDB aarch64 讀寫都通過。"],
-  "next": ["下載模型並量測載入。"],
-  "sources": [{ "text": "memrag env check 輸出" }],
+  "conclusion": [
+    "ruri 系列整體最好；ruri-v3-310m 在三種範圍都是第一名，但在「只搜本人」時和 ruri-v3-30m、Qwen3 的差距不顯著。",
+    "產品現用的 bge-base-zh-v1.5 在所有範圍都顯著最差，只搜本人時 nDCG@10 比最佳模型低 0.16，表記差異題落差最大；換成日文模型的效果明確。",
+    "實際系統一定要用 person_id 過濾；日期與類別的問題要靠 metadata 過濾，不能只靠 Embedding。"
+  ],
+  "next": [
+    "5.1.4：用 Qwen3-1.7B 產生對話並總結成記憶，再用相同指令評估，看真實總結下排名是否改變。",
+    "5.1.8：閾值校準與小候選集誤擋率；最後才用測試集 120 題做正式評估。"
+  ],
+  "sources": [
+    { "text": "results/runs/20261107-221101_retrieval_eval/（metrics.json、per_query.jsonl）" },
+    { "text": "data/00_gold/（標準事實、測試問題與標註）" }
+  ],
   "related": [
-    { "id": "2026-11-06_aarch64-package-resolve", "relation": "當時只確認可解析，這次實際安裝" }
-  ]
-}
-},{"id":"2026-11-07_nano-model-inventory","record":{
-  "title": "Nano 模型盤點與 Gemma 刪除",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "環境檢查",
-  "status": "通過",
-  "backfilled": true,
-  "purpose": "磁碟只剩 8.7 GB，哪些模型可以刪除？",
-  "environment": ["robo@172.28.0.147"],
-  "method": ["盤點 Nano 上的模型，確認是否有程式或其他專案引用", "經使用者確認後，刪除明確無人使用的模型"],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["模型", "處理", "原因"],
-      "rows": [
-        ["LM Studio Gemma 4 E4B GGUF（約 5.9 GiB）", "已刪除", "沒有程式引用"],
-        ["~/gemma4_litert", "保留", "產品 LLM，50023 有符號連結"],
-        ["Hugging Face 快取（約 8 GB）", "保留", "st3、stt-test 使用"],
-        ["50018 的 ASR 模型（約 15 GB）", "保留", "屬於其他專案，要先問過負責人"]
-      ]
-    },
-    { "kind": "p", "text": "磁碟剩餘空間從 8.7 GB 增加到 15 GB。" }
-  ],
-  "conclusion": ["候選模型總大小維持約 4 GB 的預算。"],
-  "next": ["下載模型與建環境前都要再檢查剩餘空間。"],
-  "sources": [{ "text": "計畫書 D9" }],
-  "related": []
-}
-},{"id":"2026-11-07_prompt-format-check","record":{
-  "title": "Prompt 格式與變數檢查",
-  "date": "2026-11-07",
-  "task": "5.1.4",
-  "type": "自動測試",
-  "status": "通過",
-  "backfilled": true,
-  "purpose": "四份 prompt 的格式是否正確？宣告的變數和內文是否一致？",
-  "environment": ["robo@172.28.0.147，uv + PyYAML", "暫時性檢查腳本，正式測試尚未建立"],
-  "method": ["解析 prompts/*.yaml，檢查必要欄位、檔名與內容一致、變數宣告與內文相符；最後一次另外檢查 user 訊息含假名"],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["執行次數", "3 次（建立時、改成只做日文後、指令改成日文後）"],
-        ["最後結果", "4 份全部通過"],
-        ["曾出現的失敗", "無"]
-      ]
-    },
-    {
-      "kind": "note",
-      "title": "只驗格式",
-      "text": "沒有呼叫 LLM，不代表 prompt 的效果好。品質要到 5.1.4 才會測。"
-    }
-  ],
-  "conclusion": ["格式正確，內容仍是草稿。"],
-  "next": ["5.1.4 用真實 LLM 測試第一次通過率與 Gold Fact 覆蓋率。"],
-  "sources": [{ "text": "prompts/" }],
-  "related": []
-}
-},{"id":"2026-11-07_readme-sync-check","record":{
-  "title": "README 覆蓋檢查與 Nano 同步驗證",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "環境檢查",
-  "status": "通過",
-  "backfilled": true,
-  "purpose": "每個資料夾都有 README 嗎？Windows 的檔案有完整同步到 Nano 嗎？",
-  "environment": ["Windows D:\\RAG TEST → robo@172.28.0.147:~/50019/rag_test"],
-  "method": [
-    "用 scripts/nano_sync.ps1 同步，比對兩邊每個檔案的 SHA-256",
-    "暫時性腳本檢查每個資料夾都有 README，且列出所有檔案；正式測試 test_readme_coverage.py 尚未建立"
-  ],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["執行次數", "每次改動後都重跑，早期次數沒有逐一記錄"],
-        ["最後結果", "檔案數相同，hash 全部一致；每個資料夾的 README 都列出所有檔案"],
-        ["曾出現的失敗", "無"]
-      ]
-    }
-  ],
-  "conclusion": ["同步與 README 目前都正確。"],
-  "next": ["5.1.2 改成正式的自動測試。"],
-  "sources": [{ "text": "scripts/nano_sync.ps1" }],
-  "related": []
-}
-},{"id":"2026-11-07_results-tab-check","record":{
-  "title": "計畫書網頁與測試結果分頁驗證",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "自動測試",
-  "status": "通過",
-  "backfilled": false,
-  "purpose": "新做的測試結果分頁能不能正常操作？計畫書的圖表與版面有沒有問題？",
-  "environment": [
-    "本機 Edge 無頭模式，開啟本機檔案",
-    "暫時性測試腳本，正式測試尚未建立",
-    "沒有測到線上網址：Chrome 擴充功能未連線"
-  ],
-  "method": [
-    "用腳本操作分頁、下拉選單、紀錄連結與計畫書錨點，共 13 項檢查",
-    "截圖檢查桌面版、390px 窄螢幕與深色模式"
-  ],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["最後結果", "13 項全部通過，共跑 4 次"],
-        ["流程圖", "3 張都成功畫出"],
-        ["窄螢幕", "修正後文字沒有超出畫面，寬表格可左右捲動"],
-        ["深色模式", "測試結果分頁顯示正常"]
-      ]
-    },
-    {
-      "kind": "table",
-      "caption": "過程中發現並修正的問題",
-      "columns": ["問題", "處理"],
-      "rows": [
-        ["流程圖從未畫出：v0.9 以前的網頁沒有載入 Mermaid，只會顯示原始文字", "載入 Mermaid"],
-        ["帶錨點開啟時，圖表畫完後位置跑掉", "圖表畫完後重新捲動"],
-        ["平滑捲動干擾錨點跳轉，前 2 次測試失敗", "移除平滑捲動"],
-        ["窄螢幕時 commit hash 撐破清單", "限制欄寬並允許斷行"],
-        ["窄螢幕時 Schema 欄位名稱被切成多行", "表格改成可左右捲動"]
-      ]
-    },
-    {
-      "kind": "note",
-      "title": "測試的限制",
-      "text": "這是本機測試，沒有在線上網址操作過。無頭模式下，整頁捲動後的截圖是空白的；用 iframe 捲動時畫面正常，所以判斷是截圖工具的問題。"
-    }
-  ],
-  "conclusion": ["分頁功能正常，也修正了流程圖一直沒有畫出的問題。"],
-  "next": ["請使用者打開線上網址確認一次。", "5.1.2 改成正式測試。"],
-  "sources": [{ "text": "docs/project_plan.html" }],
-  "related": []
-}
-},{"id":"2026-11-07_skeleton-dev-tests","record":{
-  "title": "專案骨架與 Library 開發測試（Windows）",
-  "date": "2026-11-07",
-  "task": "5.1.2",
-  "type": "自動測試",
-  "status": "通過",
-  "backfilled": false,
-  "purpose": "新建的專案骨架、模型 registry、CLI 與架構規則，在 Windows 上能不能通過不需要模型的測試？",
-  "environment": [
-    "Windows 筆電，Python 3.11.16（uv 管理），torch 2.15.0+cpu、transformers 5.22.2、sentence-transformers 6.2.0、chromadb 1.5.9",
-    "開發中反覆執行，依規則合併成一筆"
-  ],
-  "method": [
-    "uv run pytest -q：分層規則（import-linter）、README 覆蓋、registry 驗證、prefix 規則、Fake 實作的契約測試、ChromaDB 讀寫、CLI",
-    "真實模型的測試在 Windows 自動略過，改在 Nano 執行"
-  ],
-  "results": [
-    {
-      "kind": "table",
-      "columns": ["項目", "結果"],
-      "rows": [
-        ["執行次數", "完整測試 6 次，另跑單元測試 1 次"],
-        ["最後結果", "63 通過、48 略過（真實模型），0 失敗"],
-        ["分層規則", "4 條 import-linter 規則全部通過"]
-      ]
-    },
-    {
-      "kind": "table",
-      "caption": "過程中出現過的失敗",
-      "columns": ["問題", "處理"],
-      "rows": [
-        ["契約測試的參數寫法錯誤，無法收集測試", "改正 pytest 參數格式"],
-        ["ChromaDB 在 Windows 刪除暫存資料夾時檔案仍被佔用", "先釋放 client 再清理；讀寫本身正常"],
-        ["新資料夾還沒有 README", "補齊所有資料夾的 README"],
-        ["import-linter 產生的 .import_linter_cache 沒列在 README", "加入略過清單、.gitignore 與同步排除"],
-        ["量測用的記憶體取樣執行緒在 Nano 當掉（見載入量測第 1 次）", "修正後補上單元測試 test_probe_sampler.py"]
-      ]
-    }
-  ],
-  "conclusion": ["Windows 上不需要模型的部分全部通過；真實模型要看 Nano 的結果。"],
-  "next": ["在 Nano 跑完整測試，包含真實模型。"],
-  "sources": [{ "text": "tests/" }, { "text": "pyproject.toml（分層規則）" }],
-  "related": [
-    { "id": "2026-11-07_nano-contract-tests", "relation": "Nano 上的完整測試" }
+    { "id": "2026-11-07_load-probe", "relation": "同一批模型的效能量測" }
   ]
 }
 }]}</script>
@@ -2225,11 +1867,13 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
       sources.appendChild(li);
     });
     root.appendChild(section('原始資料', [sources]));
-    if (record.related.length) {
+    // Only link records shown on this page; process logs in reports/log/ are not embedded
+    var shown = record.related.filter(function (item) { return byId[item.id]; });
+    if (shown.length) {
       var related = el('ul');
-      record.related.forEach(function (item) {
+      shown.forEach(function (item) {
         var li = el('li');
-        li.appendChild(recordLink(item.id, byId[item.id] ? byId[item.id].title : item.id));
+        li.appendChild(recordLink(item.id, byId[item.id].title));
         li.appendChild(document.createTextNode('：' + item.relation));
         related.appendChild(li);
       });
@@ -2246,35 +1890,27 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     note.appendChild(el('p', '', data.overview.summary));
     root.appendChild(note);
     root.appendChild(section('目前選型結論', [el('p', '', data.overview.conclusion)]));
+    root.appendChild(section('本期重點', [list(data.overview.findings)]));
 
-    var counts = {};
-    records.forEach(function (record) { counts[record.status] = (counts[record.status] || 0) + 1; });
-    var stats = el('div', 'stat-row');
-    [['全部紀錄', records.length]].concat(['通過', '失敗', '部分完成', '中止', '資訊'].map(function (status) {
-      return [status, counts[status] || 0];
-    })).forEach(function (pair) {
-      var stat = el('div', 'stat');
-      stat.appendChild(el('strong', '', String(pair[1])));
-      stat.appendChild(el('span', '', pair[0]));
-      stats.appendChild(stat);
-    });
-    root.appendChild(section('紀錄統計', [stats]));
+    var comparison = data.overview.comparison;
+    var compareNodes = [table(comparison)];
+    if (comparison.note) compareNodes.push(el('p', 'record-meta', comparison.note));
+    root.appendChild(section('模型比較', compareNodes));
+
+    root.appendChild(section('下一步', [list(data.overview.next)]));
 
     root.appendChild(section('任務進度', [table({
-      columns: ['編號', '任務', '進度', '紀錄數'],
-      numeric: [3],
-      rows: data.overview.tasks.map(function (task) {
-        return [task.id, task.name, task.progress, String(records.filter(function (record) { return record.task === task.id; }).length)];
-      })
+      columns: ['編號', '任務', '進度'],
+      rows: data.overview.tasks.map(function (task) { return [task.id, task.name, task.progress]; })
     })]));
 
     var all = el('ul');
     records.forEach(function (record) {
       var li = el('li');
-      li.appendChild(recordLink(record.id, record.date + '｜' + record.title + '｜' + record.status));
+      li.appendChild(recordLink(record.id, record.date + '｜' + record.title));
       all.appendChild(li);
     });
-    root.appendChild(section('全部紀錄', [all]));
+    root.appendChild(section('實驗紀錄', [all]));
     return root;
   }
 

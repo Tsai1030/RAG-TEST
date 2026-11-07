@@ -2,7 +2,7 @@
   "title": "GLuCoSE 與 transformers 5 相容性檢查",
   "date": "2026-11-07",
   "task": "5.1.2",
-  "type": "環境檢查",
+  "type": "模型篩選",
   "status": "失敗",
   "backfilled": false,
   "purpose": "GLuCoSE-base-ja-v2 能不能和其他模型共用同一個 transformers 版本？",

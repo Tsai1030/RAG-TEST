@@ -10,4 +10,5 @@
 | `__init__.py` | 檔案 | 套件標記，內容為空 | 手動維護 | 是 |
 | `ports.py` | 檔案 | Port 介面：目前有 `EmbeddingProvider`，其他 Port 隨各任務加入 | 手動維護 | 是 |
 | `errors.py` | 檔案 | 領域錯誤：`MemRAGError`、`ConfigError`、`ModelNotAvailableError` | 手動維護 | 是 |
+| `metrics/` | 資料夾 | 指標與統計的純函式，說明見 [`metrics/README.md`](metrics/README.md) | — | 是 |
 | `schemas/` | 資料夾 | 資料結構，說明見 [`schemas/README.md`](schemas/README.md) | — | 是 |
