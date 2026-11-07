@@ -1,7 +1,6 @@
 """Port interfaces. Application code depends on these, never on implementations.
 
-Other ports in the plan (VectorStore, Profiler) are added with the tasks that
-implement them.
+The Profiler port in the plan is added with the task that implements it.
 """
 
 from __future__ import annotations
@@ -9,7 +8,9 @@ from __future__ import annotations
 from typing import Protocol, Sequence
 
 from memrag.domain.schemas.embedding import EncodedText, ModelSpec, TextKind
+from memrag.domain.schemas.memory import MemoryRecord
 from memrag.domain.schemas.prompt import PromptTemplate
+from memrag.domain.schemas.retrieval import MemoryFilter, SearchHit
 
 Vector = Sequence[float]
 ChatMessage = dict[str, str]  # {"role": "system" | "user" | "assistant", "content": ...}
@@ -35,6 +36,24 @@ class LLMProvider(Protocol):
         ...
 
     def chat(self, messages: Sequence[ChatMessage], json_schema: dict) -> str: ...
+
+
+class VectorStore(Protocol):
+    """Memories and their L2-normalized vectors for one embedding model.
+
+    `upsert` is idempotent (memory_id is the key). `search` returns at most k hits,
+    best first, all accepted by `flt.matches`; fewer when fewer memories match.
+    """
+
+    def upsert(self, records: Sequence[MemoryRecord], vectors: Sequence[Vector]) -> None: ...
+
+    def search(self, vector: Vector, k: int, flt: MemoryFilter | None = None) -> list[SearchHit]: ...
+
+    def matching_ids(self, flt: MemoryFilter) -> set[str]:
+        """Every stored memory the filter accepts, without ranking (to check filter translation)."""
+        ...
+
+    def count(self) -> int: ...
 
 
 class PromptStore(Protocol):

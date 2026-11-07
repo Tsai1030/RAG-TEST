@@ -7,9 +7,9 @@ import json
 import sys
 
 from memrag import MemRAGError
-from memrag.interfaces.cli.commands import corpus, dataset, embed, env, evaluate, models
+from memrag.interfaces.cli.commands import corpus, dataset, embed, env, evaluate, models, store
 
-COMMANDS = [env, models, embed, dataset, corpus, evaluate]
+COMMANDS = [env, models, embed, dataset, corpus, store, evaluate]
 
 
 def print_json(data) -> None:

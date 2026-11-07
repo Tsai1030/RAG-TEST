@@ -551,6 +551,100 @@ def select_models(retrieval_run: str, threshold_run: str, probe_run: str, note: 
     return {"run_dir": str(run_dir), **out}
 
 
+def build_index(model: str, device: str = "auto", fake: bool = False) -> dict:
+    """Embed the frozen memory corpus with `model` and upsert it into results/vector_db/ (idempotent)."""
+    import time
+
+    spec = bootstrap.registry().get(model)
+    memories = load_memories()
+    embedder = bootstrap.embedding_provider(bootstrap.registry(), model, device=device, fake=fake)
+    start = time.perf_counter()
+    vectors = embedder.embed_documents([m.content for m in memories])
+    embed_s = time.perf_counter() - start
+    store = bootstrap.vector_store(model, spec.dim)
+    start = time.perf_counter()
+    store.upsert(memories, vectors)
+    out = {"model": model, "memories": store.count(), "embed_s": round(embed_s, 2),
+           "upsert_s": round(time.perf_counter() - start, 2), "path": str(bootstrap.VECTOR_DB)}
+    store.close()
+    return out
+
+
+def search_memories(text: str, model: str, person_id: str | None = None, category: str | None = None,
+                    date_from: str | None = None, date_to: str | None = None, k: int = 5,
+                    device: str = "auto", fake: bool = False) -> dict:
+    """Search the index built by `build_index`; the query gets the model's query prefix."""
+    from memrag.domain.errors import ConfigError
+    from memrag.domain.schemas.retrieval import MemoryFilter
+
+    spec = bootstrap.registry().get(model)
+    flt = MemoryFilter(person_id=person_id, category=category, date_from=date_from, date_to=date_to)
+    store = bootstrap.vector_store(model, spec.dim)
+    if store.count() == 0:
+        store.close()
+        raise ConfigError(f"no index for {model}; run `memrag store build --model {model}` first")
+    embedder = bootstrap.embedding_provider(bootstrap.registry(), model, device=device, fake=fake)
+    hits = store.search(embedder.embed_queries([text])[0], k, flt)
+    store.close()
+    memories = {m.memory_id: m for m in load_memories()}
+    return {
+        "query": embedder.explain(text, "query").encoded_text, "model": model,
+        "filter": flt.model_dump(mode="json", exclude_none=True),
+        "hits": [{"score": round(h.score, 4), **memories[h.memory_id].model_dump(
+            mode="json", include={"memory_id", "person_id", "category", "event_date", "content"})} for h in hits],
+    }
+
+
+def check_vector_store(run_dir: str, note: str = "") -> dict:
+    """Plan 5.1.5: ChromaDB (HNSW) against the exact store, reusing the vectors of a memory-corpus run.
+
+    Per model: index build time and disk size, filter translation on query and random
+    filters, cross-user hits, and HNSW recall@10. Writes results/runs/<run_id>_store_check/.
+    """
+    import shutil
+    import tempfile
+    import time
+
+    from memrag.application.evaluation.store_check import compare
+    from memrag.domain.errors import ConfigError
+    from memrag.infrastructure.storage.manifest import new_run_dir, write_json
+    from memrag.infrastructure.vectorstore.chroma_store import ChromaStore
+    from memrag.infrastructure.vectorstore.exact_store import ExactStore
+
+    source, old, data, corpus_info, vectors = _load_run(run_dir)
+    if corpus_info["corpus_name"] != "memories":
+        raise ConfigError("check the store on a --corpus memories run")
+    memories = load_memories()
+    if [m.memory_id for m in memories] != [d.doc_id for d in data.docs]:
+        raise ConfigError("memories.jsonl order differs from the run's documents")
+    results = {}
+    for model, (query_vecs, doc_vecs) in vectors.items():
+        dim = doc_vecs.shape[1]
+        exact = ExactStore(dim)
+        exact.upsert(memories, doc_vecs)
+        folder = Path(tempfile.mkdtemp(prefix="memrag_chroma_"))
+        try:
+            chroma = ChromaStore(model, dim, folder)
+            start = time.perf_counter()
+            chroma.upsert(memories, doc_vecs)
+            build_s = time.perf_counter() - start
+            chroma.upsert(memories[:50], doc_vecs[:50])  # idempotent: must not add rows
+            idempotent = chroma.count() == len(memories)
+            row = compare(memories, data.queries, query_vecs, exact, chroma)
+            disk = sum(p.stat().st_size for p in folder.rglob("*") if p.is_file())
+            chroma.close()
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+        results[model] = {"dim": dim, "memories": len(memories), "build_s": round(build_s, 3),
+                          "disk_mib": round(disk / 2**20, 2), "idempotent_upsert": idempotent, **row}
+    out = new_run_dir(bootstrap.project_root(), "store_check")
+    write_json(out / "metrics.json", {"models": results})
+    write_json(out / "manifest.json", {
+        "run_id": out.name, "kind": "store_check", "source_run": source.name, "note": note,
+        "created": datetime.now().isoformat(timespec="seconds"), **corpus_info, "queries": len(data.queries)})
+    return {"run_dir": str(out), "models": results}
+
+
 def rescore_retrieval(run_dir: str, note: str = "") -> dict:
     """Score a finished evaluation again with the current labels, reusing its saved vectors.
 

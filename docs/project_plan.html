@@ -771,7 +771,9 @@ uv run memrag eval calibrate results/runs/&lt;dev run&gt; --write # 校準閾值
 uv run memrag eval thresholds results/runs/&lt;test run&gt; # 用固定閾值評估小候選集
 uv run memrag select --retrieval &lt;test run&gt; --thresholds &lt;threshold run&gt; --probe &lt;probe run&gt; # 依 selection.yaml 選型
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
-uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
+uv run memrag store build --model ruri-v3-130m  # 把記憶庫寫進 results/vector_db（ChromaDB）
+uv run memrag store check results/runs/&lt;memories run&gt; # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
+uv run memrag search "好きな食べ物" --model ruri-v3-130m --person p01 --category preference -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
 uv run memrag profile --config configs/experiments/smoke.yaml
 uv run memrag eval --config configs/experiments/full_metric.yaml
@@ -1061,7 +1063,8 @@ ruri-v3-130m:
         </ul>
         <dl class="outcome">
           <div><dt>驗收</dt><dd>單一與組合過濾的結果都與 <code>ExactStore</code> 一致；<strong><code>person_id</code> 過濾 100% 不跨人</strong>（含屬性測試）；無結果與 <code>event_date</code> 為空時，行為符合文件；分別記錄 HNSW 相對於精確搜尋的 Recall。</dd></div>
-          <div><dt>手動測試</dt><dd><code>memrag search "..." --person p001 --category event --from 2026-01-01 --to 2026-06-30</code></dd></div>
+          <div><dt>手動測試</dt><dd><code>memrag store build --model ruri-v3-130m</code>，再 <code>memrag search "..." --model ruri-v3-130m --person p01 --category event --from 2026-10-01 --to 2026-10-31</code></dd></div>
+          <div><dt>狀態</dt><dd>驗收項目全部達成（2026-11-08，<code>memrag store check</code>，run_id <code>20261108-012345_store_check</code>、Nano <code>20261108-012751_store_check</code>）。6 個模型、每個 540 組過濾（300 組隨機的單一與組合過濾＋每題兩種範圍）與精確搜尋接受的記憶完全相同；只搜本人時不跨人；HNSW Recall@10 不過濾 0.996–1.000、搭配 person_id 過濾 1.000；upsert 冪等；沒有日期的記憶存 <code>event_date_ord = 0</code>，任何日期條件都會排除它，沒有結果時回傳空清單。測試：<code>tests/integration/test_chroma_store.py</code>。</dd></div>
         </dl>
       </article>
 
@@ -1432,7 +1435,8 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     "閾值：開發集校準、測試集套用；無答案誤召回 4.6%–6.9%（信賴區間下限都 ≤ 5%，通過門檻），但正確記憶仍有 32%–53% 被擋，需要 LLM 判斷當第二層。",
     "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別 75%、日期 77% 正確，直接過濾會擋掉正確記憶。",
     "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
-    "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。"
+    "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。",
+    "向量庫：ChromaDB（HNSW）的過濾與精確搜尋完全一致、只搜本人時不跨人；搭配使用者過濾時 Recall@10 是 1.000，選型結論不受近似搜尋影響。"
   ],
   "charts": [
     {
@@ -1504,14 +1508,14 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   },
   "next": [
     "選型報告（docs/analysis/selection_report.md）與 ADR 0001（提議中）已完成，請審閱。",
-    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程（含 LLM 判斷第二層、日期過濾的用法）與各階段量測，在實際流程中確認主選模型。"
+    "5.1.6–5.1.7：完整流程（含 LLM 判斷第二層、日期過濾的用法、新舊記憶並存時的回答）與各階段量測，在實際流程中確認主選模型。"
   ],
   "tasks": [
     { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成" },
     { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：首輪名單與效能量測" },
     { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "完成：201 題測試問題與標準答案，κ 0.90" },
     { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "完成：390 場對話、641 筆記憶（Qwen3-4B），覆蓋 98%" },
-    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（評估目前用精確搜尋）" },
+    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "完成：ChromaDB 過濾與精確搜尋一致、不跨人，HNSW Recall@10 ≥ 0.996" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
     { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "完成（精確搜尋）：開發集、閾值校準、測試集；HNSW 與 ranx 交叉驗證未做" },
@@ -2265,6 +2269,70 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   ],
   "related": [
     { "id": "2026-11-08_retrieval-eval-memories-dev", "relation": "同一批向量與記憶庫的排序指標" }
+  ]
+}
+},{"id":"2026-11-08_vector-store-check","record":{
+  "title": "向量庫：ChromaDB（HNSW）對精確搜尋",
+  "date": "2026-11-08",
+  "task": "5.1.5",
+  "type": "指標評估",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "改用 ChromaDB 的近似搜尋（HNSW）後，過濾條件是否和精確搜尋完全一致？會不會拿到別人的記憶？會漏掉多少本來找得到的記憶？",
+  "environment": [
+    "chromadb 1.5.9 內嵌模式、cosine；Windows 與 Nano（Linux aarch64）各跑一次，結果相同",
+    "沿用測試集記憶庫評估存下的向量（20261108-005438_retrieval_eval_memories），641 筆記憶、120 題",
+    "run_id 20261108-012345_store_check（Windows）、20261108-012751_store_check（Nano）",
+    "不需要停常駐服務"
+  ],
+  "method": [
+    "uv run memrag store check results/runs/20261108-005438_retrieval_eval_memories",
+    "過濾一致性：每題的過濾（只搜本人、本人＋日期／類別）加上 300 組隨機的單一與組合過濾（使用者、類別、有起無迄或有迄無起的日期），比較兩邊接受的記憶集合",
+    "跨人：只搜本人時，ChromaDB 前 10 名裡出現別人的記憶的次數",
+    "HNSW Recall@10：ChromaDB 前 10 名與精確搜尋前 10 名的重疊比例",
+    "冪等：重複寫入 50 筆後筆數不變"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "caption": "ChromaDB 對精確搜尋（6 個模型）",
+      "columns": ["模型", "建索引", "磁碟", "過濾不一致", "跨人", "Recall@10 不過濾", "Recall@10 只搜本人", "Recall@10 本人＋過濾"],
+      "numeric": [1, 2, 3, 4, 5, 6, 7],
+      "rows": [
+        ["ruri-v3-130m", "0.58 s", "3.8 MiB", "0", "0", "0.996", "1.000", "1.000"],
+        ["ruri-v3-30m", "0.60 s", "2.0 MiB", "0", "0", "1.000", "1.000", "1.000"],
+        ["ruri-v3-310m", "0.61 s", "3.9 MiB", "0", "0", "0.998", "1.000", "1.000"],
+        ["qwen3-emb-0.6b", "0.70 s", "4.3 MiB", "0", "0", "0.999", "1.000", "1.000"],
+        ["e5-small", "0.74 s", "2.4 MiB", "0", "0", "0.999", "1.000", "1.000"],
+        ["bge-base-zh-v1.5（對照組）", "0.60 s", "3.9 MiB", "0", "0", "0.998", "1.000", "1.000"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "過濾轉換正確：每個模型 540 組過濾（300 組隨機＋120 題 × 2 種範圍）都和精確搜尋接受完全相同的記憶。",
+        "只搜本人時從未出現別人的記憶；搭配 person_id 過濾的 Recall@10 是 1.000，HNSW 沒有漏掉任何結果。",
+        "不過濾、在全部 641 筆裡搜尋時，Recall@10 是 0.996–1.000，偶爾有 1 筆排名第 10 附近的記憶不同。",
+        "建索引不到 1 秒、磁碟 2–4 MiB；用 ruri-v3-130m 向量化 641 筆在 Nano GPU 上 3.5 秒。",
+        "實際搜尋（ruri-v3-130m）：「先週何かあったっけ」加上日期過濾後正好找回 2 筆正確答案；「とんこつラーメン、今も食べてる？」第一名是舊的喜好，改變後的記憶排第三，5.1.6 要讓回答時看日期判斷哪一筆是現況。"
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "沒有日期與沒有結果時的行為",
+      "text": "ChromaDB 的 metadata 不能存 None，所以沒有 event_date 的記憶存 event_date_ord = 0；只要有日期條件（包含只有起日或只有迄日），就加上 event_date_ord > 0，結果和精確搜尋一樣排除沒有日期的記憶。沒有符合過濾的記憶時回傳空清單，不報錯。"
+    }
+  ],
+  "conclusion": [
+    "ChromaDB 通過 5.1.5 全部驗收：過濾與精確搜尋一致、person_id 過濾不跨人、HNSW Recall 已記錄。",
+    "以本專案的資料量（每人約 30 筆），HNSW 和精確搜尋在搭配使用者過濾時結果相同，選型結論不受影響。"
+  ],
+  "next": ["5.1.6：串接總結、寫入、檢索、閾值與 LLM 回答；處理事實更新（新舊記憶並存）時的回答。"],
+  "sources": [
+    { "text": "results/runs/20261108-012345_store_check/、results/runs/20261108-012751_store_check/" }
+  ],
+  "related": [
+    { "id": "2026-11-08_test-set-eval", "relation": "使用同一批向量" }
   ]
 }
 }]}</script>

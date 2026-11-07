@@ -390,7 +390,9 @@ uv run memrag eval calibrate results/runs/<dev run> --write # 校準閾值，寫
 uv run memrag eval thresholds results/runs/<test run> # 用固定閾值評估小候選集
 uv run memrag select --retrieval <test run> --thresholds <threshold run> --probe <probe run> # 依 selection.yaml 選型
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
-uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
+uv run memrag store build --model ruri-v3-130m  # 把記憶庫寫進 results/vector_db（ChromaDB）
+uv run memrag store check results/runs/<memories run> # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
+uv run memrag search "好きな食べ物" --model ruri-v3-130m --person p01 --category preference -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
 uv run memrag profile --config configs/experiments/smoke.yaml
 uv run memrag eval --config configs/experiments/full_metric.yaml
@@ -681,7 +683,9 @@ flowchart LR
 - 無結果與 `event_date` 為空時，行為符合文件
 - 分別記錄 HNSW 相對於精確搜尋的 Recall
 
-**手動測試：** `memrag search "..." --person p001 --category event --from 2026-01-01 --to 2026-06-30`
+**手動測試：** `memrag store build --model ruri-v3-130m`，再 `memrag search "..." --model ruri-v3-130m --person p01 --category event --from 2026-10-01 --to 2026-10-31`
+
+**狀態：** 驗收項目全部達成（2026-11-08，`memrag store check`，run_id `20261108-012345_store_check`、Nano `20261108-012751_store_check`）。6 個模型、每個 540 組過濾（300 組隨機的單一與組合過濾＋每題兩種範圍）與精確搜尋接受的記憶完全相同；只搜本人時不跨人；HNSW Recall@10 不過濾 0.996–1.000、搭配 person_id 過濾 1.000；upsert 冪等；沒有日期的記憶存 `event_date_ord = 0`，任何日期條件都會排除它，沒有結果時回傳空清單。測試：`tests/integration/test_chroma_store.py`。
 
 ### 5.1.6 Full RAG Pipeline Integration
 

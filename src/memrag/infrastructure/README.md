@@ -12,4 +12,5 @@
 | `prompts.py` | 檔案 | `PromptStore` 實作：讀取 `prompts/<名稱>.v<版本>.yaml`，檢查名稱與版本和檔名一致 | 手動維護 | 是 |
 | `embedding/` | 資料夾 | Embedding 模型相關實作，說明見 [`embedding/README.md`](embedding/README.md) | — | 是 |
 | `llm/` | 資料夾 | LLM 相關實作：llama-server 用戶端、測試用的假 LLM、回應快取，說明見 [`llm/README.md`](llm/README.md) | — | 是 |
+| `vectorstore/` | 資料夾 | 向量庫：ChromaDB 與精確搜尋，說明見 [`vectorstore/README.md`](vectorstore/README.md) | — | 是 |
 | `storage/` | 資料夾 | 執行結果的儲存，說明見 [`storage/README.md`](storage/README.md) | — | 是 |

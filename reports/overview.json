@@ -9,7 +9,8 @@
     "閾值：開發集校準、測試集套用；無答案誤召回 4.6%–6.9%（信賴區間下限都 ≤ 5%，通過門檻），但正確記憶仍有 32%–53% 被擋，需要 LLM 判斷當第二層。",
     "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別 75%、日期 77% 正確，直接過濾會擋掉正確記憶。",
     "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
-    "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。"
+    "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。",
+    "向量庫：ChromaDB（HNSW）的過濾與精確搜尋完全一致、只搜本人時不跨人；搭配使用者過濾時 Recall@10 是 1.000，選型結論不受近似搜尋影響。"
   ],
   "charts": [
     {
@@ -81,14 +82,14 @@
   },
   "next": [
     "選型報告（docs/analysis/selection_report.md）與 ADR 0001（提議中）已完成，請審閱。",
-    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程（含 LLM 判斷第二層、日期過濾的用法）與各階段量測，在實際流程中確認主選模型。"
+    "5.1.6–5.1.7：完整流程（含 LLM 判斷第二層、日期過濾的用法、新舊記憶並存時的回答）與各階段量測，在實際流程中確認主選模型。"
   ],
   "tasks": [
     { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成" },
     { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：首輪名單與效能量測" },
     { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "完成：201 題測試問題與標準答案，κ 0.90" },
     { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "完成：390 場對話、641 筆記憶（Qwen3-4B），覆蓋 98%" },
-    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（評估目前用精確搜尋）" },
+    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "完成：ChromaDB 過濾與精確搜尋一致、不跨人，HNSW Recall@10 ≥ 0.996" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
     { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "完成（精確搜尋）：開發集、閾值校準、測試集；HNSW 與 ranx 交叉驗證未做" },

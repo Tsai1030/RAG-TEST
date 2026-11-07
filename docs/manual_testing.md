@@ -59,6 +59,22 @@
 - **改了 prompt 或 `configs/pipeline.yaml` 後結果沒變：** 快取的 key 包含 prompt 全文、模型與參數，有改就會重新呼叫；如果還是一樣，確認改的是 `prompt_version` 指向的那份檔案。
 - **記憶沒有對應到 Gold Fact：** 用 `memrag summarize <log_id>` 看 `turns [...] → ...`；LLM 引用的句子沒有落在事實的句子上時就對應不到，這會算進「未覆蓋」。
 
+## 5.1.5 向量庫與過濾檢索
+
+第 1 項 Windows 上就能做（要先用 `nano_fetch.ps1` 取回一次記憶庫評估）；第 2–4 項在 Nano 上，不需要停服務。
+
+| # | 指令 | 預期結果 | 實際結果 |
+|---|---|---|---|
+| 1 | `uv run memrag store check results/runs/20261108-005438_retrieval_eval_memories` | 6 個模型的「過濾不一致」與「跨人」都是 0；Recall@10「本人」與「過濾」是 1.000 | |
+| 2 | `uv run memrag store build --model ruri-v3-130m` | `641 筆`；再跑一次筆數不變 | |
+| 3 | `uv run memrag search "先週何かあったっけ" --model ruri-v3-130m --person p06 --from 2026-10-25 --to 2026-10-31 -k 3` | 只有 2 筆：10/25 走完十公里、10/30 第一次專案會議 | |
+| 4 | `uv run memrag search "ラーメン" --model ruri-v3-130m --person p99` | 「沒有符合過濾條件的記憶」，不報錯 | |
+
+**常見問題**
+
+- **Windows 上 `store check` 結束後刪不掉暫存資料夾：** ChromaDB 在 Windows 會延後釋放檔案，程式已忽略這個錯誤，暫存資料夾可以手動刪除。
+- **想清空向量庫：** 刪除 `results/vector_db/` 後重新 `store build`。
+
 ## 5.1.8 檢索準確度（預評估）
 
 目前把 Gold Facts 當記憶庫。第 1 項 Windows 上就能做；第 2 項要在 Nano 上跑，Qwen3 用 float32 約需 3 GiB，要先停止常駐服務。

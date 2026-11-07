@@ -13,6 +13,7 @@ MODELS_CONFIG = Path("configs") / "models.yaml"
 PIPELINE_CONFIG = Path("configs") / "pipeline.yaml"
 THRESHOLDS_CONFIG = Path("configs") / "thresholds.yaml"
 SELECTION_CONFIG = Path("configs") / "selection.yaml"
+VECTOR_DB = Path("results") / "vector_db"
 PROMPTS_DIR = Path("prompts")
 DIALOGUES = Path("data") / "01_dialogues" / "dialogues.jsonl"
 MEMORIES_DIR = Path("data") / "02_memories"
@@ -80,6 +81,15 @@ def response_cache(cfg: dict, root: Path | None = None):
     from memrag.infrastructure.llm.cache import FileResponseCache
 
     return FileResponseCache((root or project_root()) / cfg["summarize"]["cache_dir"])
+
+
+def vector_store(model: str, dim: int, root: Path | None = None):
+    """The persistent ChromaDB store of one model under results/vector_db/."""
+    from memrag.infrastructure.vectorstore.chroma_store import ChromaStore
+
+    path = (root or project_root()) / VECTOR_DB
+    path.mkdir(parents=True, exist_ok=True)
+    return ChromaStore(model, dim, path)
 
 
 def resolve_device(device: str) -> str:

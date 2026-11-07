@@ -9,6 +9,7 @@
 | `README.md` | 檔案 | 本文件：說明這個資料夾的內容與格式 | 手動維護 | 是 |
 | `runs/` | 資料夾 | 每次執行一個子資料夾 `<日期-時間>_<種類>/`，格式見下方 | `memrag models probe` 等指令產生；Nano 上的結果用 `scripts/nano_fetch.ps1` 取回 | 否 |
 | `service_logs/` | 資料夾 | 只在 Nano 上：`scripts/nano_services.sh` 重啟常駐服務時，原本沒有記錄檔的服務會寫到這裡；`nano_llm_session.sh` 的 llama-server 輸出也在這裡 | 自動產生 | 否 |
+| `vector_db/` | 資料夾 | `memrag store build` 建的 ChromaDB 向量庫，每個模型一個 collection；可隨時重建 | `memrag store build --model <模型>` | 否 |
 | `llm_cache/` | 資料夾 | 只在 Nano 上：通過驗證的 LLM 總結輸出，一個 key 一個 JSON 檔；key 是對話、prompt、模型與參數的 hash，任何一項改變就不會命中 | `memrag summarize`、`memrag corpus build` 自動產生 | 否 |
 
 ## runs/<run_id>/ 的檔案
