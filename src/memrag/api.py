@@ -472,6 +472,85 @@ def evaluate_thresholds(run_dir: str, note: str = "") -> dict:
     return {"run_dir": str(out), "split": corpus_info["split"], "models": results}
 
 
+def select_models(retrieval_run: str, threshold_run: str, probe_run: str, note: str = "") -> dict:
+    """Plan 5.1.9: hard gates and weighted ranking from configs/selection.yaml.
+
+    retrieval_run: test-split `eval run` or `eval rescore` on the memory corpus;
+    threshold_run: `eval thresholds` on the same vectors; probe_run: `models probe`.
+    """
+    import json
+
+    import yaml
+
+    from memrag.application.evaluation import selection as sel
+    from memrag.domain.errors import ConfigError
+    from memrag.infrastructure.storage.manifest import new_run_dir, write_json
+
+    root = bootstrap.project_root()
+    rules = yaml.safe_load((root / bootstrap.SELECTION_CONFIG).read_text(encoding="utf-8"))
+    ev = rules["evaluation"]
+
+    def load(path: str, name: str) -> dict:
+        return json.loads((Path(path) / name).read_text(encoding="utf-8"))
+
+    r_man, r_met = load(retrieval_run, "manifest.json"), load(retrieval_run, "metrics.json")
+    t_man, t_met = load(threshold_run, "manifest.json"), load(threshold_run, "metrics.json")
+    source = r_man.get("source_run", r_man["run_id"])
+    if r_man["split"] != ev["split"] or r_man.get("corpus_name", "memories") != ev["corpus"]:
+        raise ConfigError(f"{Path(retrieval_run).name}: selection needs split={ev['split']}, corpus={ev['corpus']}")
+    if t_man["source_run"] != source:
+        raise ConfigError("the threshold run must use the same vectors as the retrieval run")
+    probe = {}
+    for line in (Path(probe_run) / "load_probe.jsonl").read_text(encoding="utf-8").splitlines():
+        row = json.loads(line)
+        if row.get("device") == "cuda" and row.get("ok"):
+            probe[row["model"]] = row
+    owners = {m.memory_id: m.person_id for m in load_memories()}
+    askers = {q.query_id: q.person_id for q in load_gold_set().queries}
+    cross: dict[str, int] = {}
+    for line in (Path(retrieval_run) / "per_query.jsonl").read_text(encoding="utf-8").splitlines():
+        row = json.loads(line)
+        if row["scope"] == ev["scope"]:
+            cross[row["model"]] = cross.get(row["model"], 0) + sum(
+                owners[t[0]] != askers[row["query_id"]] for t in row["top"])
+    reg = bootstrap.registry(root)
+    facts = []
+    for name, m in r_met["models"].items():
+        spec = reg.get(name)
+        s, th = m[ev["scope"]], t_met["models"][name]["by_size"]["all"]
+        facts.append(sel.ModelFacts(
+            name=name, role=spec.role, commercial_ok=spec.commercial_ok,
+            metrics={"ndcg@10": s["ndcg@10"]["mean"], "recall@5": s["recall@5"]["mean"],
+                     "small_set_false_block": th["false_block"]["rate"],
+                     "query_latency_p95_ms": probe[name]["latency_ms_p95"],
+                     "memory_peak_mib": probe[name]["sys_mem_peak_mib"]},
+            cross_user_errors=cross.get(name, 0), false_recall_ci_low=th["false_recall"]["ci95"][0]))
+    sel.apply_gates(facts, rules["hard_gates"])
+    ranked = [f for f in facts if not f.gate_failures and (f.role == "candidate" or not rules["candidates_only"])]
+    scores = sel.weighted_scores(ranked, rules["weights"])
+    order = sorted(scores, key=lambda n: -scores[n]["score"])
+    significance = r_met["compare_ndcg@10"][ev["scope"]]
+    out = {
+        "rules_version": rules["version"], "retrieval_run": Path(retrieval_run).name,
+        "threshold_run": Path(threshold_run).name, "probe_run": Path(probe_run).name,
+        "models": [{"name": f.name, "role": f.role, **f.metrics, "cross_user_errors": f.cross_user_errors,
+                    "false_recall_ci_low": f.false_recall_ci_low, "gate_failures": f.gate_failures,
+                    **({"score": scores[f.name]["score"], "normalised": scores[f.name]["normalised"],
+                        "rank": order.index(f.name) + 1} if f.name in scores else {})} for f in facts],
+        "ranking": order,
+        "ndcg_best": significance["best"],
+        "ndcg_vs_best": significance["vs_best"],
+        "sensitivity": sel.sensitivity(ranked, rules["weights"]),
+        "tie_rule": rules["tie_rule"],
+    }
+    run_dir = new_run_dir(root, "selection")
+    write_json(run_dir / "selection.json", out)
+    write_json(run_dir / "manifest.json", {"run_id": run_dir.name, "kind": "selection", "note": note,
+                                           "created": datetime.now().isoformat(timespec="seconds"),
+                                           "rules": str(bootstrap.SELECTION_CONFIG)})
+    return {"run_dir": str(run_dir), **out}
+
+
 def rescore_retrieval(run_dir: str, note: str = "") -> dict:
     """Score a finished evaluation again with the current labels, reusing its saved vectors.
 

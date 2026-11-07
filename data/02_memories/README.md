@@ -22,7 +22,7 @@
 | `README.md` | 檔案 | 本文件：說明這個資料夾的內容 | 手動維護 | 是 |
 | `memories.jsonl` | 檔案 | 一行一筆 `MemoryRecord`：LLM 填的 `category`、`content`、`event_date`、`people`、`source_turn_ids`，程式補的 ID 與日期，以及評估用的 `gold_fact_ids` | `memrag corpus build`（Nano，run_id `20261107-231513_summarize`） | 是 |
 | `corpus_manifest.json` | 檔案 | 語料的 sha256、對話檔的 sha256、LLM 與參數、prompt 的 hash、驗收數字、未覆蓋的事實 | 同上 | 是 |
-| `pool_labels.jsonl` | 檔案 | 池化審查（計畫 5.1.8）：開發集每題取各模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶重新給 0／1／2 分，覆蓋繼承的分數 | Claude 依 `docs/annotation_guide.md` 判斷（annotator `claude-pool`） | 是 |
+| `pool_labels.jsonl` | 檔案 | 池化審查（計畫 5.1.8）：每題取各模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的記憶重新給 0／1／2 分，覆蓋繼承的分數；開發集 400 組、測試集 585 組（判斷時看不到是哪個模型找出來的） | Claude 依 `docs/annotation_guide.md` 判斷（annotator `claude-pool`） | 是 |
 
 ## 記憶的分數
 

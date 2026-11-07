@@ -769,6 +769,7 @@ uv run memrag eval run --models all --split dev --corpus memories # 檢索準確
 uv run memrag eval rescore results/runs/&lt;run_id&gt; # 標註更新後，沿用存下的向量重算
 uv run memrag eval calibrate results/runs/&lt;dev run&gt; --write # 校準閾值，寫入 configs/thresholds.yaml
 uv run memrag eval thresholds results/runs/&lt;test run&gt; # 用固定閾值評估小候選集
+uv run memrag select --retrieval &lt;test run&gt; --thresholds &lt;threshold run&gt; --probe &lt;probe run&gt; # 依 selection.yaml 選型
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
 uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
@@ -1210,7 +1211,8 @@ ruri-v3-130m:
               <li>兩種記憶庫的排名一致，前四名的信賴區間重疊；LLM 記憶庫上日期／類別過濾會擋掉 metadata 有誤的正確記憶，時間題約 0.6（Gold Facts 上是 1.0）</li>
               <li><strong>池化審查（2026-11-08 完成，開發集）：</strong>每題取 6 個模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶重新判斷，寫在 <code>data/02_memories/pool_labels.jsonl</code>；35 組調高、8 組調低</li>
               <li><strong>閾值校準與小候選集（2026-11-08 完成，開發集）：</strong>每題抽 2–10 筆的候選集（正例含 1 筆 2 分記憶，負例全是 0 分；有答案題拿掉相關記憶也當負例，因為無答案題只有 8 題），校準無答案誤召回 ≤ 5% 的最低閾值，寫入 <code>configs/thresholds.yaml</code>（run_id <code>20261108-004204_threshold_calibration</code>）。正確記憶誤擋率：ruri-v3-130m 29%、ruri-v3-310m 32%、ruri-v3-30m 34%、Qwen3 35%、e5-small 48%、bge 61%；單靠閾值會擋掉約 3 成的正確記憶，5.1.6 要保留 LLM 判斷這一層</li>
-              <li>指標函式通過手算案例；與 <code>ranx</code> 的交叉驗證、HNSW 與測試集評估還沒做</li>
+              <li><strong>測試集（2026-11-08 完成）：</strong>閾值與 <code>selection.yaml</code> 在評估前提交（commit <code>2022cb6</code>）。LLM 記憶庫、只搜本人 nDCG@10：ruri-v3-310m 0.872、ruri-v3-130m 0.864、Qwen3 0.863、ruri-v3-30m 0.859（差距不顯著）、e5-small 0.815、bge 0.690；測試集池化 585 組。固定閾值下無答案誤召回 4.6%–6.9%（下限都 ≤ 5%），正確記憶誤擋 31.7%（130m）到 53.3%（bge）</li>
+              <li>指標函式通過手算案例；與 <code>ranx</code> 的交叉驗證、HNSW 還沒做</li>
             </ul></dd></div>
         </dl>
       </article>
@@ -1244,6 +1246,7 @@ ruri-v3-130m:
         </ul>
         <dl class="outcome">
           <div><dt>驗收</dt><dd><code>selection_report.md</code> 與 ADR 完成；報告數字都能追溯到 <code>run_id</code>；審閱者能依文件重現主要結果。</dd></div>
+          <div><dt>狀態</dt><dd>依凍結規則的排名完成（<code>memrag select</code>，run_id <code>20261108-010358_selection</code>）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告、ADR 與 JMTEB 比較還沒寫；延遲與記憶體要在 5.1.7 與部署伺服器上確認。</dd></div>
         </dl>
       </article>
     </section>
@@ -1419,92 +1422,88 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
 </div>
 
 <script id="report-data" type="application/json">{"overview":{
-  "headline": "換成 LLM 實際總結的記憶後，排名不變：ruri 系列最好，產品現用的 bge 明顯最差",
-  "summary": "記憶改用 Qwen3-4B 實際總結出來的 641 筆（含漏記、雜訊、類別與日期錯誤），用開發集 81 題測 6 個模型。只搜本人時，ruri-v3-310m 的 nDCG@10 最高（0.902），ruri-v3-130m、ruri-v3-30m、Qwen3 和它的差距不顯著；產品現用的 bge-base-zh-v1.5 只有 0.680。排名和用標準事實當記憶庫時一致。測試集與閾值評估還沒做。",
-  "conclusion": "尚未選型。初步排名：ruri-v3-310m ≥ ruri-v3-130m ≈ ruri-v3-30m ≈ Qwen3-Embedding-0.6B > multilingual-e5-small > bge-base-zh-v1.5（對照組）。ruri-v3-310m 在兩種記憶庫都是第一，對表記差異與雜訊最穩。",
+  "headline": "初步選型：主選 ruri-v3-130m，備選 ruri-v3-30m；產品現用的 bge 在所有準確度指標都顯著落後",
+  "summary": "測試集 120 題的正式評估完成，閾值與選型規則都在測試前凍結。LLM 總結的記憶庫上，ruri-v3-310m、ruri-v3-130m、Qwen3、ruri-v3-30m 的 nDCG@10 都在 0.86–0.87，差距不顯著；依凍結的加權規則，ruri-v3-130m 第一（Recall@5 最高、小候選集誤擋率最低、記憶體最省），權重 ±0.05 時第一名不變。HNSW、完整流程與部署伺服器上的效能還沒驗證，所以是初步結論。",
+  "conclusion": "主選 ruri-v3-130m（Apache-2.0）；備選 ruri-v3-30m（最快，適合只有 CPU 的環境，但表記差異題較弱）。產品現用的 bge-base-zh-v1.5 建議替換。",
   "findings": [
-    "LLM 總結的記憶庫，只搜本人時 nDCG@10：ruri-v3-310m 0.902、ruri-v3-130m 0.888、ruri-v3-30m 0.868、Qwen3 0.851、e5-small 0.751、bge 0.680；前四名的信賴區間重疊。",
-    "記憶變雜之後所有模型下降 0.03–0.12，表記差異題落差最大；ruri-v3-310m 最穩（0.956 → 0.902），Qwen3 退步最多（0.852 → 0.678）。",
-    "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別只有 75%、日期 77% 正確，過濾會擋掉正確的記憶，時間題從標準事實的 1.0 掉到 0.6 左右。",
-    "總結用 LLM：Nano 現有的 Qwen3-1.7B、Qwen3.5-2B 寫不出可用的日文；改用 Qwen3-4B-Instruct-2507，390 場對話全部總結成功，覆蓋 98% 的事實。",
-    "閾值：各模型校準到無答案誤召回 5% 時，小候選集的正確記憶誤擋率是 29%（ruri-v3-130m）到 61%（bge）。同一個使用者的記憶彼此相似，單靠分數閾值分不開，需要 LLM 判斷或 Reranker 當第二層。",
+    "測試集 nDCG@10（LLM 記憶庫、只搜本人）：ruri-v3-310m 0.872、ruri-v3-130m 0.864、Qwen3 0.863、ruri-v3-30m 0.859、e5-small 0.815、bge 0.690；前四名差距不顯著，e5 與 bge 顯著較差。",
+    "加權排名（nDCG 40%、Recall@5 25%、誤擋率 20%、延遲 10%、記憶體 5%）：ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097。",
+    "閾值：開發集校準、測試集套用；無答案誤召回 4.6%–6.9%（信賴區間下限都 ≤ 5%，通過門檻），但正確記憶仍有 32%–53% 被擋，需要 LLM 判斷當第二層。",
+    "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別 75%、日期 77% 正確，直接過濾會擋掉正確記憶。",
     "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
-    "效能上 6 個模型在 Nano GPU 的單句延遲都在 84 ms 內，記憶體峰值都在 1.7 GiB 內；ruri-v3-30m 最快，ruri-v3-130m 的準確度接近 310m、延遲約一半。"
+    "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。"
   ],
   "charts": [
     {
       "kind": "chart",
-      "chart": "dot",
-      "caption": "準確度：nDCG@10（只搜本人，開發集 73 題，線段是 95% 信賴區間，越高越好）",
-      "categories": ["ruri-v3-310m", "ruri-v3-130m", "ruri-v3-30m", "Qwen3-Embedding-0.6B", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
-      "series": [
-        { "name": "LLM 總結的記憶庫（641 筆）", "values": [0.902, 0.888, 0.868, 0.851, 0.751, 0.680],
-          "ci": [[0.861, 0.939], [0.836, 0.932], [0.807, 0.919], [0.791, 0.903], [0.675, 0.822], [0.601, 0.752]] },
-        { "name": "標準事實記憶庫（400 筆）", "values": [0.945, 0.920, 0.931, 0.921, 0.871, 0.780],
-          "ci": [[0.912, 0.973], [0.881, 0.953], [0.889, 0.964], [0.880, 0.956], [0.815, 0.922], [0.712, 0.842]] }
-      ],
-      "min": 0.5, "max": 1.0,
-      "note": "橫軸從 0.5 開始。前四名的信賴區間重疊，差距不顯著；e5-small 與 bge 顯著較差。"
+      "chart": "bar",
+      "caption": "選型加權分數（測試集，依凍結規則，越高越好）",
+      "categories": ["ruri-v3-130m", "ruri-v3-30m", "ruri-v3-310m", "Qwen3-Embedding-0.6B", "multilingual-e5-small"],
+      "series": [{ "name": "加權分數", "values": [0.920, 0.874, 0.751, 0.608, 0.097] }],
+      "min": 0, "max": 1.0, "digits": 3, "axisDigits": 1,
+      "note": "各指標在候選間 min-max 正規化，會放大小差距；nDCG@10 的前四名其實差不到 0.013。權重 ±0.05 時第一名不變。對照組 bge 不參與排名。"
     },
     {
       "kind": "chart",
       "chart": "dot",
-      "caption": "表記差異題（漢字、平假名、簡稱）的 nDCG@10：記憶變雜之後的退步",
-      "categories": ["ruri-v3-310m", "ruri-v3-130m", "ruri-v3-30m", "Qwen3-Embedding-0.6B", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
+      "caption": "準確度：測試集 nDCG@10（只搜本人，線段是 95% 信賴區間，越高越好）",
+      "categories": ["ruri-v3-310m", "ruri-v3-130m", "Qwen3-Embedding-0.6B", "ruri-v3-30m", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
       "series": [
-        { "name": "LLM 總結的記憶庫", "values": [0.902, 0.877, 0.792, 0.678, 0.609, 0.577] },
-        { "name": "標準事實記憶庫", "values": [0.956, 0.963, 0.874, 0.852, 0.714, 0.664] }
+        { "name": "LLM 總結的記憶庫", "values": [0.872, 0.864, 0.863, 0.859, 0.815, 0.690],
+          "ci": [[0.829, 0.913], [0.821, 0.902], [0.820, 0.903], [0.819, 0.896], [0.766, 0.861], [0.621, 0.755]] },
+        { "name": "標準事實記憶庫", "values": [0.916, 0.914, 0.932, 0.917, 0.886, 0.791],
+          "ci": [[0.878, 0.947], [0.882, 0.944], [0.900, 0.961], [0.883, 0.949], [0.846, 0.924], [0.732, 0.847]] }
       ],
       "min": 0.5, "max": 1.0,
-      "note": "每個模型只有 15 題左右，僅看趨勢。ruri-v3-310m 退步最少，Qwen3 退步最多。"
-    },
-    {
-      "kind": "chart",
-      "chart": "scatter",
-      "caption": "準確度與速度：nDCG@10（LLM 記憶庫）對 Nano GPU 單句延遲 p95",
-      "x": { "min": 0, "max": 100, "digits": 0, "label": "GPU 單句延遲 p95（ms），越左越快" },
-      "y": { "min": 0.6, "max": 0.95, "digits": 2, "label": "nDCG@10，越上越準" },
-      "legend": ["候選", "對照組（產品現用）"],
-      "points": [
-        { "label": "ruri-v3-310m", "x": 39.9, "y": 0.902, "dy": -6 },
-        { "label": "ruri-v3-130m", "x": 30.9, "y": 0.888, "dy": 14 },
-        { "label": "ruri-v3-30m", "x": 17.9, "y": 0.868, "dy": 14 },
-        { "label": "Qwen3-0.6B", "x": 83.6, "y": 0.851 },
-        { "label": "e5-small", "x": 19.8, "y": 0.751 },
-        { "label": "bge-base-zh", "x": 20.0, "y": 0.680, "group": 1 }
-      ],
-      "note": "延遲是 Nano 上的單次量測，只用來比較模型之間的差異；正式數字要在部署伺服器重測。"
+      "note": "橫軸從 0.5 開始。前四名的信賴區間幾乎完全重疊。"
     },
     {
       "kind": "chart",
       "chart": "bar",
-      "caption": "小候選集（2–10 筆）的正確記憶誤擋率：閾值設在無答案誤召回 5% 時（越低越好）",
-      "categories": ["ruri-v3-130m", "ruri-v3-310m", "ruri-v3-30m", "Qwen3-Embedding-0.6B", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
+      "caption": "小候選集（2–10 筆）的正確記憶誤擋率：測試集、固定閾值（越低越好）",
+      "categories": ["ruri-v3-130m", "Qwen3-Embedding-0.6B", "ruri-v3-30m", "ruri-v3-310m", "multilingual-e5-small", "bge-base-zh-v1.5（產品現用）"],
       "series": [
-        { "name": "正確記憶誤擋率", "values": [0.294, 0.322, 0.338, 0.350, 0.479, 0.608],
-          "ci": [[0.200, 0.401], [0.222, 0.429], [0.233, 0.452], [0.243, 0.458], [0.371, 0.586], [0.494, 0.714]] }
+        { "name": "正確記憶誤擋率", "values": [0.317, 0.328, 0.331, 0.442, 0.508, 0.533],
+          "ci": [[0.229, 0.408], [0.239, 0.421], [0.244, 0.417], [0.347, 0.538], [0.416, 0.602], [0.435, 0.629]] }
       ],
       "min": 0, "max": 0.8, "digits": 2, "axisDigits": 1,
-      "note": "開發集、LLM 記憶庫；每個模型各自校準閾值。即使最好的模型也有約 3 成的正確記憶被擋，單靠閾值不夠。"
+      "note": "閾值在開發集校準到無答案誤召回 5%。即使最好的模型也有約 3 成的正確記憶被擋，單靠閾值不夠。"
+    },
+    {
+      "kind": "chart",
+      "chart": "scatter",
+      "caption": "準確度與速度：測試集 nDCG@10（LLM 記憶庫）對 Nano GPU 單句延遲 p95",
+      "x": { "min": 0, "max": 100, "digits": 0, "label": "GPU 單句延遲 p95（ms），越左越快" },
+      "y": { "min": 0.65, "max": 0.9, "digits": 2, "label": "nDCG@10，越上越準" },
+      "legend": ["候選", "對照組（產品現用）"],
+      "points": [
+        { "label": "ruri-v3-310m", "x": 39.9, "y": 0.872, "dy": -6 },
+        { "label": "ruri-v3-130m", "x": 30.9, "y": 0.864, "dy": 16 },
+        { "label": "ruri-v3-30m", "x": 17.9, "y": 0.859, "dy": 22 },
+        { "label": "Qwen3-0.6B", "x": 83.6, "y": 0.863 },
+        { "label": "e5-small", "x": 19.8, "y": 0.815 },
+        { "label": "bge-base-zh", "x": 20.0, "y": 0.690, "group": 1 }
+      ],
+      "note": "延遲是 Nano 上的單次量測，只用來比較模型之間的差異；正式數字要在部署伺服器重測。"
     }
   ],
   "comparison": {
-    "caption": "模型比較總表（2026-11-08）",
-    "columns": ["模型", "角色", "nDCG@10（LLM 記憶庫）", "nDCG@10（標準事實）", "表記差異題（LLM 記憶庫）", "小候選集誤擋率", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
-    "numeric": [2, 3, 4, 5, 6, 7, 8, 9],
+    "caption": "模型比較總表（測試集，2026-11-08）",
+    "columns": ["模型", "角色", "加權排名", "nDCG@10（LLM 記憶庫）", "nDCG@10（標準事實）", "Recall@5", "小候選集誤擋率", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
+    "numeric": [3, 4, 5, 6, 7, 8, 9, 10],
     "rows": [
-      ["ruri-v3-310m", "候選", "0.902", "0.945", "0.902", "32%", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
-      ["ruri-v3-130m", "候選", "0.888", "0.920", "0.877", "29%", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
-      ["ruri-v3-30m", "候選", "0.868", "0.931", "0.792", "34%", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
-      ["Qwen3-Embedding-0.6B", "候選", "0.851", "0.921", "0.678", "35%", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
-      ["multilingual-e5-small", "候選", "0.751", "0.871", "0.609", "48%", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
-      ["bge-base-zh-v1.5", "對照組（產品現用）", "0.680", "0.780", "0.577", "61%", "—", "20.0 ms", "734 MiB", "104.6 ms"]
+      ["ruri-v3-130m", "候選（主選）", "1", "0.864", "0.914", "0.904", "31.7%", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
+      ["ruri-v3-30m", "候選（備選）", "2", "0.859", "0.917", "0.899", "33.1%", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
+      ["ruri-v3-310m", "候選", "3", "0.872", "0.916", "0.889", "44.2%", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
+      ["Qwen3-Embedding-0.6B", "候選", "4", "0.863", "0.932", "0.846", "32.8%", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
+      ["multilingual-e5-small", "候選", "5", "0.815", "0.886", "0.827", "50.8%", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
+      ["bge-base-zh-v1.5", "對照組（產品現用）", "—", "0.690", "0.791", "0.687", "53.3%", "—", "20.0 ms", "734 MiB", "104.6 ms"]
     ],
-    "note": "準確度：開發集 73 題有答案的問題，只搜該使用者的記憶，精確搜尋，信賴區間約 ±0.04–0.05。「LLM 記憶庫」是 Qwen3-4B 總結 390 場模擬對話得到的 641 筆記憶，經池化審查補判；「標準事實」是 400 筆事實原文。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
+    "note": "準確度：測試集，只搜該使用者的記憶，精確搜尋；LLM 記憶庫有答案 106 題、標準事實 108 題，經池化審查補判；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "5.1.8：閾值已寫入 configs/thresholds.yaml 並提交；接著凍結選型權重（selection.yaml），再用測試集 120 題做正式評估。",
-    "5.1.6：決定 metadata 可能出錯時，日期／類別過濾要怎麼用。"
+    "5.1.9：撰寫選型報告與 ADR。",
+    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程（含 LLM 判斷第二層、日期過濾的用法）與各階段量測，在實際流程中確認主選模型。"
   ],
   "tasks": [
     { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成" },
@@ -1514,8 +1513,8 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（評估目前用精確搜尋）" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
-    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "進行中：開發集在兩種記憶庫的結果與閾值校準完成；測試集未做" },
-    { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "尚未開始" }
+    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "完成（精確搜尋）：開發集、閾值校準、測試集；HNSW 與 ranx 交叉驗證未做" },
+    { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "進行中：依凍結規則排名完成，主選 ruri-v3-130m；報告與 ADR 未寫" }
   ]
 }
 ,"records":[{"id":"2026-11-07_glucose-transformers-compat","record":{
@@ -1904,6 +1903,80 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "2026-11-08_retrieval-eval-memories-dev", "relation": "用這份語料做的準確度評估" }
   ]
 }
+},{"id":"2026-11-08_model-selection","record":{
+  "title": "選型分析：依凍結規則排名",
+  "date": "2026-11-08",
+  "task": "5.1.9",
+  "type": "選型分析",
+  "status": "部分完成",
+  "backfilled": false,
+  "purpose": "依測試前凍結的 configs/selection.yaml，哪個 Embedding 模型最適合日文對話記憶？",
+  "environment": [
+    "uv run memrag select（run_id 20261108-010358_selection），規則 configs/selection.yaml version 1（commit 2022cb6）",
+    "準確度：測試集、LLM 記憶庫、只搜本人（20261108-010052_retrieval_rescore）；小候選集：20261108-010213_threshold_eval",
+    "延遲與記憶體：Nano CUDA 的載入量測（20261107-183526_load_probe）"
+  ],
+  "method": [
+    "第一階段硬性門檻：可商用、只搜本人時不出現別人的記憶、小候選集無答案誤召回的信賴區間下限 ≤ 5%、延遲 p95 ≤ 500 ms、記憶體峰值 ≤ 3 GiB",
+    "第二階段加權：nDCG@10 40%、Recall@5 25%、小候選集誤擋率 20%、延遲 10%、記憶體 5%；各指標在通過門檻的候選間做 min-max 正規化（最好 1、最差 0）",
+    "敏感度：每個權重 ±0.05（其他權重等比例調整），看第一名是否改變",
+    "對照組 bge-base-zh-v1.5 不參與排名"
+  ],
+  "results": [
+    {
+      "kind": "chart",
+      "chart": "bar",
+      "caption": "加權分數（滿分 1，越高越好）",
+      "categories": ["ruri-v3-130m", "ruri-v3-30m", "ruri-v3-310m", "qwen3-emb-0.6b", "e5-small"],
+      "series": [{ "name": "加權分數", "values": [0.920, 0.874, 0.751, 0.608, 0.097] }],
+      "min": 0, "max": 1.0, "digits": 3, "axisDigits": 1,
+      "note": "min-max 正規化會放大小差距：nDCG@10 0.859–0.872 的差距不顯著，但正規化後是 0.77–1.0。"
+    },
+    {
+      "kind": "table",
+      "caption": "門檻與加權排名",
+      "columns": ["排名", "模型", "加權分數", "nDCG@10", "Recall@5", "誤擋率", "延遲 p95", "記憶體峰值", "硬性門檻"],
+      "numeric": [2, 3, 4, 5, 6, 7],
+      "rows": [
+        ["1", "ruri-v3-130m", "0.920", "0.864", "0.904", "31.7%", "30.9 ms", "917 MiB", "通過"],
+        ["2", "ruri-v3-30m", "0.874", "0.859", "0.899", "33.1%", "17.9 ms", "938 MiB", "通過"],
+        ["3", "ruri-v3-310m", "0.751", "0.872", "0.889", "44.2%", "39.9 ms", "1,450 MiB", "通過"],
+        ["4", "qwen3-emb-0.6b", "0.608", "0.863", "0.846", "32.8%", "83.6 ms", "1,356 MiB", "通過"],
+        ["5", "e5-small", "0.097", "0.815", "0.827", "50.8%", "19.8 ms", "1,688 MiB", "通過"],
+        ["—", "bge-base-zh-v1.5（對照組）", "—", "0.690", "0.687", "53.3%", "20.0 ms", "734 MiB", "不排名"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "5 個候選都通過硬性門檻：都可商用、只搜本人時沒有出現別人的記憶、誤召回下限 ≤ 5%、延遲與記憶體都遠低於門檻。",
+        "權重每項 ±0.05 時，第一名都還是 ruri-v3-130m。",
+        "平手規則：前四名 nDCG@10 差距不顯著，依規則選較輕量的模型；ruri-v3-130m 比 310m、Qwen3 輕，且加權第一。",
+        "ruri-v3-130m 的優勢：Recall@5 最高、小候選集誤擋率最低、記憶體最省；在開發集的表記差異題也接近 310m（0.877 vs 0.902）。"
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "還不是最終決定",
+      "text": "延遲與記憶體只有 Nano 上的載入量測，正式數字要等部署伺服器（D10）；HNSW 搜尋、完整流程與各階段量測（5.1.5–5.1.7）還沒做；選型報告與 ADR 尚未撰寫。標註由 Claude 進行，建議日後請日文母語者抽查。"
+    }
+  ],
+  "conclusion": [
+    "依凍結規則，主選 ruri-v3-130m（Apache-2.0）；備選 ruri-v3-30m，適合只有 CPU 或要求更低延遲的環境，但表記差異題較弱。",
+    "產品現用的 bge-base-zh-v1.5 在所有準確度指標都顯著落後，建議換成 ruri-v3-130m。"
+  ],
+  "next": [
+    "撰寫 selection_report.md 與 ADR。",
+    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程與各階段量測，確認主選模型在實際流程中的表現。"
+  ],
+  "sources": [
+    { "text": "results/runs/20261108-010358_selection/selection.json" },
+    { "text": "configs/selection.yaml" }
+  ],
+  "related": [
+    { "id": "2026-11-08_test-set-eval", "relation": "選型使用的測試集結果" }
+  ]
+}
 },{"id":"2026-11-08_retrieval-eval-memories-dev","record":{
   "title": "準確度評估：LLM 總結的記憶庫（開發集）",
   "date": "2026-11-08",
@@ -2022,6 +2095,95 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   "related": [
     { "id": "2026-11-07_retrieval-eval-gold-dev", "relation": "同一批題目在標準事實記憶庫上的結果" },
     { "id": "2026-11-07_summarizer-llm-corpus", "relation": "這次使用的記憶語料" }
+  ]
+}
+},{"id":"2026-11-08_test-set-eval","record":{
+  "title": "正式評估：測試集 120 題",
+  "date": "2026-11-08",
+  "task": "5.1.8",
+  "type": "指標評估",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "用開發集沒看過的測試集，在凍結的閾值與選型規則下，確認各模型的準確度與小候選集表現。",
+  "environment": [
+    "robo@172.28.0.147（Jetson Orin Nano，CUDA）：20261108-005438_retrieval_eval_memories、20261108-005638_retrieval_eval_gold",
+    "Windows 重算（沿用向量）：池化後 20261108-010052_retrieval_rescore、固定閾值 20261108-010213_threshold_eval",
+    "評估前已提交 configs/thresholds.yaml 與 configs/selection.yaml（commit 2022cb6）",
+    "llama-server 與 pocket_tts_server 由 nano_measure.sh 停止（00:54–00:58），結束後重啟並確認 /health 回 200"
+  ],
+  "method": [
+    "memrag eval run --split test，LLM 記憶庫與標準事實記憶庫各跑一次；所有模型 float32、精確搜尋",
+    "池化審查：測試集每題取 6 個模型前 5 名（無答案題前 3 名），585 組重新判斷（50 組調高、4 組調低）；判斷時看不到是哪個模型找出來的",
+    "閾值：用開發集校準的固定值（memrag eval thresholds），小候選集正例 9,360 組、負例 10,620 組",
+    "LLM 記憶庫有 2 題的相關事實沒被總結出來，不計入排序指標（有答案題 106 題；標準事實記憶庫 108 題）"
+  ],
+  "results": [
+    {
+      "kind": "chart",
+      "chart": "dot",
+      "caption": "測試集 nDCG@10（只搜本人，線段是 95% 信賴區間）",
+      "categories": ["ruri-v3-310m", "ruri-v3-130m", "qwen3-emb-0.6b", "ruri-v3-30m", "e5-small", "bge-base-zh-v1.5（對照組）"],
+      "series": [
+        { "name": "LLM 總結的記憶庫", "values": [0.872, 0.864, 0.863, 0.859, 0.815, 0.690],
+          "ci": [[0.829, 0.913], [0.821, 0.902], [0.820, 0.903], [0.819, 0.896], [0.766, 0.861], [0.621, 0.755]] },
+        { "name": "標準事實記憶庫", "values": [0.916, 0.914, 0.932, 0.917, 0.886, 0.791],
+          "ci": [[0.878, 0.947], [0.882, 0.944], [0.900, 0.961], [0.883, 0.949], [0.846, 0.924], [0.732, 0.847]] }
+      ],
+      "min": 0.5, "max": 1.0,
+      "note": "橫軸從 0.5 開始。"
+    },
+    {
+      "kind": "chart",
+      "chart": "bar",
+      "caption": "測試集小候選集的正確記憶誤擋率（固定閾值，越低越好）",
+      "categories": ["ruri-v3-130m", "qwen3-emb-0.6b", "ruri-v3-30m", "ruri-v3-310m", "e5-small", "bge-base-zh-v1.5（對照組）"],
+      "series": [
+        { "name": "正確記憶誤擋率", "values": [0.317, 0.328, 0.331, 0.442, 0.508, 0.533],
+          "ci": [[0.229, 0.408], [0.239, 0.421], [0.244, 0.417], [0.347, 0.538], [0.416, 0.602], [0.435, 0.629]] }
+      ],
+      "min": 0, "max": 0.8, "digits": 2, "axisDigits": 1
+    },
+    {
+      "kind": "table",
+      "caption": "測試集指標",
+      "columns": ["模型", "nDCG@10（LLM 記憶庫）", "Recall@5", "MRR@10", "nDCG@10（標準事實）", "無答案誤召回", "正確記憶誤擋", "Top-1 錯誤率"],
+      "numeric": [1, 2, 3, 4, 5, 6, 7],
+      "rows": [
+        ["ruri-v3-310m", "0.872", "0.889", "0.887", "0.916", "4.8%", "44.2%", "8.2%"],
+        ["ruri-v3-130m", "0.864", "0.904", "0.882", "0.914", "6.2%", "31.7%", "8.8%"],
+        ["qwen3-emb-0.6b", "0.863", "0.846", "0.896", "0.932", "4.6%", "32.8%", "7.7%"],
+        ["ruri-v3-30m", "0.859", "0.899", "0.876", "0.917", "6.9%", "33.1%", "9.0%"],
+        ["e5-small", "0.815", "0.827", "0.844", "0.886", "6.8%", "50.8%", "12.4%"],
+        ["bge-base-zh-v1.5（對照組）", "0.690", "0.687", "0.746", "0.791", "6.1%", "53.3%", "24.7%"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "前四名（ruri-v3-310m、ruri-v3-130m、Qwen3、ruri-v3-30m）在兩種記憶庫都沒有顯著差異：LLM 記憶庫上差距不到 0.013；標準事實記憶庫上 Qwen3 0.932 最高。",
+        "e5-small 與產品現用的 bge-base-zh-v1.5 在兩種記憶庫都顯著較差；bge 比最佳模型低 0.18（LLM 記憶庫）。",
+        "開發集與測試集的結論一致，只有 ruri-v3-310m 的誤擋率從 32% 升到 44%：它的分數分布在測試題上偏低，開發集校準的閾值顯得太高。",
+        "無答案誤召回在測試集是 4.6%–6.9%，略高於開發集的 5% 目標，但信賴區間下限都 ≤ 5%（2.5%–4.3%），通過硬性門檻。"
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "限制",
+      "text": "有答案的題目約 106 題，分不出前四名。池化與標註都由 Claude 判斷，不是日文母語者。記憶庫只代表 Qwen3-4B 的總結品質。搜尋是精確搜尋，HNSW（5.1.5）與實際流程（5.1.6、5.1.7）還沒做。"
+    }
+  ],
+  "conclusion": [
+    "測試集確認開發集的結論：ruri 系列與 Qwen3 準確度相當，e5-small 與產品現用的 bge 顯著較差。",
+    "在固定閾值下，ruri-v3-130m 的正確記憶誤擋率最低（31.7%），ruri-v3-310m 最高（44.2%）。"
+  ],
+  "next": ["5.1.9：依凍結的規則做選型（見選型分析紀錄）。"],
+  "sources": [
+    { "text": "results/runs/20261108-010052_retrieval_rescore/、results/runs/20261108-010213_threshold_eval/、results/runs/20261108-005638_retrieval_eval_gold/" },
+    { "text": "data/02_memories/pool_labels.jsonl（開發集 400 組＋測試集 585 組）" }
+  ],
+  "related": [
+    { "id": "2026-11-08_threshold-calibration-dev", "relation": "閾值的來源" },
+    { "id": "2026-11-08_model-selection", "relation": "用這次的結果做選型" }
   ]
 }
 },{"id":"2026-11-08_threshold-calibration-dev","record":{

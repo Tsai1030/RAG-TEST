@@ -388,6 +388,7 @@ uv run memrag eval run --models all --split dev --corpus memories # 檢索準確
 uv run memrag eval rescore results/runs/<run_id> # 標註更新後，沿用存下的向量重算
 uv run memrag eval calibrate results/runs/<dev run> --write # 校準閾值，寫入 configs/thresholds.yaml
 uv run memrag eval thresholds results/runs/<test run> # 用固定閾值評估小候選集
+uv run memrag select --retrieval <test run> --thresholds <threshold run> --probe <probe run> # 依 selection.yaml 選型
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
 uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
@@ -818,7 +819,8 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 - 兩種記憶庫的排名一致，前四名的信賴區間重疊；LLM 記憶庫上日期／類別過濾會擋掉 metadata 有誤的正確記憶，時間題約 0.6（Gold Facts 上是 1.0）
 - **池化審查（2026-11-08 完成，開發集）：** 每題取 6 個模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶重新判斷，寫在 `data/02_memories/pool_labels.jsonl`；35 組調高、8 組調低
 - **閾值校準與小候選集（2026-11-08 完成，開發集）：** 每題抽 2–10 筆的候選集（正例含 1 筆 2 分記憶，負例全是 0 分；有答案題拿掉相關記憶也當負例，因為無答案題只有 8 題），校準無答案誤召回 ≤ 5% 的最低閾值，寫入 `configs/thresholds.yaml`（run_id `20261108-004204_threshold_calibration`）。正確記憶誤擋率：ruri-v3-130m 29%、ruri-v3-310m 32%、ruri-v3-30m 34%、Qwen3 35%、e5-small 48%、bge 61%；單靠閾值會擋掉約 3 成的正確記憶，5.1.6 要保留 LLM 判斷這一層
-- 指標函式通過手算案例；與 `ranx` 的交叉驗證、HNSW 與測試集評估還沒做
+- **測試集（2026-11-08 完成）：** 閾值與 `selection.yaml` 在評估前提交（commit `2022cb6`）。LLM 記憶庫、只搜本人 nDCG@10：ruri-v3-310m 0.872、ruri-v3-130m 0.864、Qwen3 0.863、ruri-v3-30m 0.859（差距不顯著）、e5-small 0.815、bge 0.690；測試集池化 585 組。固定閾值下無答案誤召回 4.6%–6.9%（下限都 ≤ 5%），正確記憶誤擋 31.7%（130m）到 53.3%（bge）
+- 指標函式通過手算案例；與 `ranx` 的交叉驗證、HNSW 還沒做
 
 ### 5.1.9 Result Analysis & Embedding Model Selection
 
@@ -846,6 +848,8 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 - 提出主選與備選，寫明不適用情境與重新評估條件
 
 **驗收：** `selection_report.md` 與 ADR 完成；報告數字都能追溯到 `run_id`；審閱者能依文件重現主要結果。
+
+**狀態：** 依凍結規則的排名完成（`memrag select`，run_id `20261108-010358_selection`）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告、ADR 與 JMTEB 比較還沒寫；延遲與記憶體要在 5.1.7 與部署伺服器上確認。
 
 ---
 

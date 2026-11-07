@@ -13,4 +13,4 @@
 | `embed.py` | 檔案 | `memrag embed`：把一句文字轉成向量；`--explain` 顯示實際送進模型的文字 | 手動維護 | 是 |
 | `dataset.py` | 檔案 | `memrag dataset validate`、`show-query`、`split`、`sample`、`agreement`：檢查與查看標準答案 | 手動維護 | 是 |
 | `corpus.py` | 檔案 | `memrag dialogues validate`、`memrag summarize`、`memrag corpus build`：檢查對話、總結一場對話（`--show-retries` 看每次嘗試）、總結全部對話並凍結語料 | 手動維護 | 是 |
-| `evaluate.py` | 檔案 | `memrag eval run`：檢索準確度評估（`--corpus gold` 或 `memories`），印出三種過濾範圍下各模型的 nDCG@10、Recall、MRR 與和最佳模型的差距 | 手動維護 | 是 |
+| `evaluate.py` | 檔案 | `memrag eval run`（檢索準確度，`--corpus gold` 或 `memories`）、`eval rescore`（沿用向量重算）、`eval calibrate`／`eval thresholds`（閾值與小候選集），以及 `memrag select`（依選型規則排名） | 手動維護 | 是 |

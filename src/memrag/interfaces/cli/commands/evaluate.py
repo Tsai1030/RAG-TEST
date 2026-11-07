@@ -8,6 +8,7 @@ SCOPE_LABELS = {"all": "不過濾（全部 20 人）", "person": "只搜本人",
 
 
 def register(sub) -> None:
+    register_select(sub)
     p = sub.add_parser("eval", help="檢索準確度評估").add_subparsers(dest="action", required=True)
 
     r = p.add_parser("run", help="用精確搜尋算各模型的 nDCG、Recall、MRR")
@@ -39,6 +40,36 @@ def register(sub) -> None:
     t.add_argument("--note", default="")
     t.add_argument("--json", action="store_true")
     t.set_defaults(handler=run_thresholds)
+
+
+def register_select(sub) -> None:
+    s = sub.add_parser("select", help="依 configs/selection.yaml 做選型：硬性門檻與加權排名（計畫 5.1.9）")
+    s.add_argument("--retrieval", required=True, help="測試集、記憶庫的 eval run 或 eval rescore 結果資料夾")
+    s.add_argument("--thresholds", required=True, help="同一批向量的 eval thresholds 結果資料夾")
+    s.add_argument("--probe", required=True, help="models probe 的結果資料夾")
+    s.add_argument("--note", default="")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(handler=run_select)
+
+
+def run_select(args) -> int:
+    from memrag.interfaces.cli.main import print_json
+
+    out = memrag.select_models(args.retrieval, args.thresholds, args.probe, note=args.note)
+    if args.json:
+        print_json(out)
+        return 0
+    print(f"結果資料夾：{out['run_dir']}")
+    print(f"  {'模型':<20}{'排名':>4}{'分數':>8}{'nDCG@10':>9}{'R@5':>7}{'誤擋':>7}{'p95 ms':>8}{'MiB':>7}  門檻")
+    for m in sorted(out["models"], key=lambda m: m.get("rank", 99)):
+        rank = m.get("rank", "—")
+        score = f"{m['score']:.3f}" if "score" in m else "—"
+        gates = "；".join(m["gate_failures"]) or ("通過" if m["role"] == "candidate" else "對照組，不排名")
+        print(f"  {m['name']:<20}{rank:>4}{score:>8}{m['ndcg@10']:>9.3f}{m['recall@5']:>7.3f}"
+              f"{m['small_set_false_block']:>7.3f}{m['query_latency_p95_ms']:>8.1f}{m['memory_peak_mib']:>7.0f}  {gates}")
+    stable = all(r["same"] for r in out["sensitivity"])
+    print(f"權重 ±0.05 敏感度：{'第一名不變' if stable else '第一名會改變：' + '、'.join(r['metric'] + r['change'] + '→' + r['first'] for r in out['sensitivity'] if not r['same'])}")
+    return 0
 
 
 def run_calibrate(args) -> int:
