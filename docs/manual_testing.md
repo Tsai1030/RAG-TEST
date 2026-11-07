@@ -42,6 +42,23 @@
 - **validate 出現錯誤：** 訊息會指出是哪一題或哪一筆事實，例如標了別人的事實、事實不符合題目的過濾條件。
 - **想看日文是否自然：** 用 `show-query` 逐題看；審閱紀錄在 `docs/annotation_review.md`。
 
+## 5.1.4 模擬對話與記憶總結
+
+第 1–3 項 Windows 上就能做；第 4–5 項要在 Nano 上跑，會暫停常駐服務。
+
+| # | 指令 | 預期結果 | 實際結果 |
+|---|---|---|---|
+| 1 | `uv run memrag dialogues validate` | `對話 390 場`，最後一行「結果：通過」 | |
+| 2 | `uv run memrag summarize d_p01_1027 --fake` | 不呼叫 LLM，每句使用者發言變成一筆記憶；第 2 句對應 `f_p01_14`、第 5 句對應 `f_p01_17` | |
+| 3 | `uv run memrag summarize d_p01_1027 --show-retries` | Windows 上沒有快取的話會連不到 LLM，顯示錯誤並結束；Nano 上全量執行後有快取，會顯示「（快取）」與 2 筆以上記憶 | |
+| 4 | Nano 上：`nohup bash scripts/nano_llm_session.sh "uv run memrag corpus build --limit 17" > /tmp/rag_llm.log 2>&1 &` | 約 2 分鐘；`success_rate 1.0`；結尾「已凍結：否」；服務重啟 | |
+| 5 | Nano 上：`bash scripts/nano_services.sh status` | 兩個服務都是 `running` | |
+
+**常見問題**
+
+- **改了 prompt 或 `configs/pipeline.yaml` 後結果沒變：** 快取的 key 包含 prompt 全文、模型與參數，有改就會重新呼叫；如果還是一樣，確認改的是 `prompt_version` 指向的那份檔案。
+- **記憶沒有對應到 Gold Fact：** 用 `memrag summarize <log_id>` 看 `turns [...] → ...`；LLM 引用的句子沒有落在事實的句子上時就對應不到，這會算進「未覆蓋」。
+
 ## 5.1.8 檢索準確度（預評估）
 
 目前把 Gold Facts 當記憶庫。第 1 項 Windows 上就能做；第 2 項要在 Nano 上跑，Qwen3 用 float32 約需 3 GiB，要先停止常駐服務。
@@ -51,6 +68,8 @@
 | 1 | `uv run memrag eval run --models ruri-v3-30m,e5-small --fake` | 印出三段表格；「只搜本人」的 nDCG@10 約 0.2–0.3（假向量等於隨機，20 選 1）；「錯人」欄在只搜本人時是 0.00 | |
 | 2 | Nano 上：`nohup bash scripts/nano_measure.sh "uv run memrag eval run --models all --split dev" > /tmp/rag_eval.log 2>&1 &` | 約 2 分鐘跑完並重啟服務；「只搜本人」時 ruri 系列的 nDCG@10 在 0.9 以上，bge-base-zh-v1.5 約 0.78 | |
 | 3 | 打開第 2 項結果資料夾的 `per_query.jsonl`，找一題 `scope` 為 `person` 的紀錄 | `top` 列出前 10 筆的事實 ID、分數與標註分數；fact ID 的使用者編號都和題目相同 | |
+| 4 | Nano 上：同第 2 項，指令加 `--corpus memories` | 改用 `data/02_memories` 的 641 筆記憶；「只搜本人」時 ruri 系列約 0.85–0.90 | |
+| 5 | Windows 上：`uv run memrag eval rescore results/runs/20261107-235108_retrieval_eval_memories`（先用 `nano_fetch.ps1` 取回） | 不載入模型，約 1 分鐘；套用 `pool_labels.jsonl` 後 ruri-v3-310m 約 0.90 | |
 
 **常見問題**
 

@@ -12,6 +12,7 @@
 | `nano_fetch.ps1` | 檔案 | 把 Nano 的 `results/runs/<run_id>/` 取回 Windows | 手動維護 | 是 |
 | `nano_services.sh` | 檔案 | 在 Nano 上執行：量測前停止、量測後重啟 `llama-server` 與 `pocket_tts_server`（D8） | 手動維護 | 是 |
 | `nano_measure.sh` | 檔案 | 在 Nano 上執行一次量測：停服務、依序跑指令、結束時一定重啟服務；用 `nohup` 背景執行，SSH 斷線也不影響 | 手動維護 | 是 |
+| `nano_llm_session.sh` | 檔案 | 在 Nano 上執行一次總結：停服務、用 `configs/pipeline.yaml` 的模型啟動自己的 `llama-server`（:8095）、依序跑指令、結束時一定關掉它並重啟服務 | 手動維護 | 是 |
 | `build_results_tab.ps1` | 檔案 | 把 `reports/` 的紀錄寫入計畫書網頁的「測試結果」分頁，`memrag report build` 完成後移除 | 手動維護 | 是 |
 
 ## nano_sync.ps1
@@ -50,4 +51,12 @@ bash scripts/nano_services.sh start    # 用同樣的指令重啟，等到服務
 
 ```bash
 nohup bash scripts/nano_measure.sh "uv run memrag models probe" "uv run pytest -q" > /tmp/rag_measure.log 2>&1 &
+```
+
+## nano_llm_session.sh
+
+和 `nano_measure.sh` 一樣會停服務並保證重啟，另外在 :8095 啟動總結用的 LLM（不共用 :8090 的服務）。伺服器的輸出寫到 `results/service_logs/rag_llm_server.log`。
+
+```bash
+nohup bash scripts/nano_llm_session.sh "uv run memrag corpus build" > /tmp/rag_llm.log 2>&1 &
 ```

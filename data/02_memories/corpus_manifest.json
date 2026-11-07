@@ -1,0 +1,44 @@
+{
+  "run_id": "20261107-231513_summarize",
+  "memories_sha256": "2bd13bef3b151319f0d28a69b8368c982a66aac1f29d5ea6ca7af36e9c35f9ca",
+  "dialogues_sha256": "5bcd02225818d9305ac1efd9d85e86d46e049c3b71226d25304fbc73fe752170",
+  "llm": {
+    "base_url": "http://127.0.0.1:8095",
+    "hf_id": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+    "revision": "a06e946bb6b655725eafa393f4a9745d460374c9",
+    "file": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+    "license": "apache-2.0",
+    "context": 8192,
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 2048,
+    "model": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+  },
+  "served_model": ".hf_cache/hub/models--unsloth--Qwen3-4B-Instruct-2507-GGUF/snapshots/a06e946bb6b655725eafa393f4a9745d460374c9/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+  "prompts": {
+    "summarize": "ea126df7788895fd9e4f8748b7a65eff6ab27f0880bb8d8aa908c9c7df600a3e",
+    "summarize_retry": "03252dd0408fc2b1aef0dc7ea181638adb800fda5bcd138489dfe0f001569ba2"
+  },
+  "stats": {
+    "logs": 390,
+    "success_rate": 1.0,
+    "first_pass_rate": 1.0,
+    "retries": {
+      "0": 390
+    },
+    "failed_logs": [],
+    "memories": 641,
+    "memories_without_gold_fact": 210,
+    "gold_fact_coverage": 0.98
+  },
+  "uncovered_facts": [
+    "f_p01_01",
+    "f_p03_20",
+    "f_p04_06",
+    "f_p05_08",
+    "f_p09_19",
+    "f_p11_02",
+    "f_p13_02",
+    "f_p17_20"
+  ]
+}

@@ -10,6 +10,10 @@ from memrag.domain.ports import EmbeddingProvider
 from memrag.infrastructure.embedding.registry import Registry, load_registry
 
 MODELS_CONFIG = Path("configs") / "models.yaml"
+PIPELINE_CONFIG = Path("configs") / "pipeline.yaml"
+PROMPTS_DIR = Path("prompts")
+DIALOGUES = Path("data") / "01_dialogues" / "dialogues.jsonl"
+MEMORIES_DIR = Path("data") / "02_memories"
 GOLD_DIR = Path("data") / "00_gold"
 GOLD_FILES = {
     "personas": "personas.jsonl",
@@ -39,6 +43,41 @@ def registry(root: Path | None = None) -> Registry:
 
 def gold_path(name: str, root: Path | None = None) -> Path:
     return (root or project_root()) / GOLD_DIR / GOLD_FILES[name]
+
+
+def pipeline_config(root: Path | None = None) -> dict:
+    import yaml
+
+    path = (root or project_root()) / PIPELINE_CONFIG
+    if not path.is_file():
+        from memrag.domain.errors import ConfigError
+
+        raise ConfigError(f"pipeline config not found: {path}")
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def llm_provider(cfg: dict, fake: bool = False):
+    if fake:
+        from memrag.infrastructure.llm.fake import FakeLLMProvider
+
+        return FakeLLMProvider()
+    from memrag.infrastructure.llm.llama_server import LlamaServerProvider
+
+    llm = cfg["llm"]
+    return LlamaServerProvider(llm["base_url"], llm["file"], temperature=llm["temperature"], seed=llm["seed"],
+                               max_tokens=llm["max_tokens"])
+
+
+def prompt_store(root: Path | None = None):
+    from memrag.infrastructure.prompts import YamlPromptStore
+
+    return YamlPromptStore((root or project_root()) / PROMPTS_DIR)
+
+
+def response_cache(cfg: dict, root: Path | None = None):
+    from memrag.infrastructure.llm.cache import FileResponseCache
+
+    return FileResponseCache((root or project_root()) / cfg["summarize"]["cache_dir"])
 
 
 def resolve_device(device: str) -> str:

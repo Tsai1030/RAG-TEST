@@ -373,7 +373,7 @@ td.nowrap { white-space: nowrap; }
 
   <main>
     <header class="hero">
-      <p class="eyebrow">WBS 5.1 · v0.14 草案 · 2026-11-07</p>
+      <p class="eyebrow">WBS 5.1 · v0.15 草案 · 2026-11-08</p>
       <h1>對話記憶 RAG：Embedding 模型評估與選型計畫書</h1>
       <p class="lede">以日文對話記憶情境選出最適合的 Embedding 模型，並用真實 pipeline 的量測數據支持這個決定。</p>
       <ol class="pipeline" aria-label="RAG 流程與負責任務">
@@ -445,7 +445,7 @@ td.nowrap { white-space: nowrap; }
           <tr><td class="nowrap"><span class="pill warn">D1</span></td><td>GPU 記憶體數據這樣呈現可以嗎？</td><td>Nano 沒有獨立 VRAM，改報 PyTorch GPU 配置峰值與系統記憶體增量</td><td>原排程的 VRAM 欄位將採用這個定義</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D2</span></td><td>最終部署硬體也是這台 Nano 嗎？</td><td><strong>已確認不是（2026-11-07）。</strong>正式部署在自架伺服器（預計在 AWS），自行執行開源模型，不使用外部 API</td><td>檢索品質的結果直接適用。Nano 改為開發與測試平台，它的延遲與記憶體數字只作模型間的相對比較；正式數字要在部署伺服器重測。硬性門檻與權重已依此調整（見 5.1.9）</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D3</span></td><td>系統是否會商用？</td><td><strong>已確認會商用（2026-11-07）</strong></td><td>非商用授權的模型不可入選；Sarashina 因此排除</td></tr>
-          <tr><td class="nowrap"><span class="pill warn">D4</span></td><td>生成與摘要使用哪個 LLM？</td><td>Nano 上以 llama.cpp 跑 <code>Qwen3-1.7B-Q4_K_M</code>（這台已有常駐服務以 <code>-ngl 99</code> 載入此模型）；假對話量大，先測速度，不夠快才改雲端 API；測試用 Replay</td><td>日文摘要品質與速度都還沒驗證，於 5.1.4 實測。正式環境的當日對話總結也是自架 LLM（D2）；測試語料最好用與正式環境相近的模型產生，否則記憶的寫法會和上線時不同</td></tr>
+          <tr><td class="nowrap"><span class="pill warn">D4</span></td><td>生成與摘要使用哪個 LLM？</td><td><strong>已確認（2026-11-07）：</strong>對話由 Claude 撰寫；總結用 Nano 上自己啟動的 <code>Qwen3-4B-Instruct-2507</code>（Q4_K_M，Apache-2.0），執行時暫停常駐服務。Nano 現有的 <code>Qwen3-1.7B</code>、<code>Qwen3.5-2B</code> 試寫時日文不自然、會漏掉事實，不採用</td><td>正式環境的總結模型還沒決定（自架，D2）；這次的語料代表「4B 級本地模型」的總結品質。正式模型確定後，可用同一套 <code>memrag corpus build</code> 重做語料再評估</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D5</span></td><td>回答階段的 LLM 為何？</td><td>與 D4 相同</td><td>影響 5.1.7 的 LLM 延遲是否有代表性</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D6</span></td><td>除日文外還要測哪些語言？</td><td><strong>已確認只做日文（2026-11-07）</strong></td><td>不製作其他語言與跨語言資料；多語模型仍可當候選，但只評估日文表現</td></tr>
           <tr><td class="nowrap"><span class="pill warn">D7</span></td><td>誰負責第二位標註與日文審閱？</td><td><strong>已確認由 Claude 負責（2026-11-07）</strong>，做法見 5.1.3</td><td>不是人類母語者審閱，這項限制要寫進選型報告</td></tr>
@@ -582,7 +582,8 @@ td.nowrap { white-space: nowrap; }
 │   │   │   ├── dialogue.py       # DialogueLog, Turn
 │   │   │   ├── memory.py         # MemoryDraft（LLM 輸出）, MemoryRecord, Category
 │   │   │   ├── retrieval.py      # MemoryFilter, SearchHit, Answer
-│   │   │   └── evaluation.py     # Persona, GoldFact, TestQuery, QueryLabel
+│   │   │   ├── prompt.py         # PromptTemplate：代入變數、內容 hash
+│   │   │   └── evaluation.py     # Persona, GoldFact, TestQuery, QueryLabel, MemoryLabel（池化審查）
 │   │   ├── metrics/
 │   │   │   ├── retrieval.py      # Recall@k, MRR, nDCG
 │   │   │   └── statistics.py     # Cohen's κ、bootstrap 信賴區間、AUC
@@ -590,8 +591,8 @@ td.nowrap { white-space: nowrap; }
 │   │   └── errors.py             # 領域錯誤類別
 │   │
 │   ├── application/              # 【第 2 層】Use cases
-│   │   ├── generate_dialogues.py # 人物設定 + Gold Facts → 假對話
-│   │   ├── summarize.py          # 結構化輸出 → 驗證 → 重試
+│   │   ├── generate_dialogues.py # 人物設定 + Gold Facts → 假對話（這輪對話由 Claude 撰寫，未實作）
+│   │   ├── summarize.py          # 結構化輸出 → 驗證 → 重試 → 對應 Gold Fact
 │   │   ├── ingest.py             # 記憶 → 向量 → 儲存
 │   │   ├── retrieve.py           # 過濾檢索
 │   │   ├── context_build.py      # 閾值後的記憶 → 送給 LLM 的文字
@@ -599,8 +600,9 @@ td.nowrap { white-space: nowrap; }
 │   │   ├── pipeline.py           # 串接全流程
 │   │   └── evaluation/
 │   │       ├── dataset_check.py  # 標準答案檢查、切分、抽樣、標註一致度
-│   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：三種過濾範圍、逐題指標、配對比較
-│   │       ├── qrels.py          # 編譯 Qrels
+│   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：兩種記憶庫、三種過濾範圍、逐題指標、配對比較
+│   │       ├── corpus_check.py   # 對話檢查、記憶語料的驗收數字
+│   │       ├── qrels.py          # 編譯 Qrels（目前在 retrieval_eval.py 內：記憶繼承事實分數＋池化判斷）
 │   │       ├── metric_runner.py  # 模型 × 設定 測試矩陣
 │   │       ├── profile_runner.py # 各階段延遲與記憶體量測
 │   │       ├── thresholds.py     # 閾值校準與小候選集評估
@@ -615,18 +617,16 @@ td.nowrap { white-space: nowrap; }
 │   │   │   ├── probe.py          # 獨立子行程量測載入、記憶體與延遲
 │   │   │   └── fake.py           # 測試用確定性向量
 │   │   ├── llm/
-│   │   │   ├── openai_compatible.py # 呼叫 OpenAI 相容 API
-│   │   │   ├── llama_cpp.py      # 啟動與管理本專案的 llama-server
-│   │   │   ├── replay.py         # 重播已錄製回應，測試免呼叫 LLM
-│   │   │   └── fake.py           # 測試用固定回應
+│   │   │   ├── llama_server.py   # 呼叫 llama-server 的 OpenAI 相容 API（啟動由 scripts/nano_llm_session.sh 負責）
+│   │   │   ├── cache.py          # 通過驗證的輸出快取，重跑免呼叫 LLM
+│   │   │   └── fake.py           # 測試用：固定回應，或把使用者發言當記憶
 │   │   ├── vectorstore/
 │   │   │   ├── chroma_store.py   # ChromaDB 內嵌模式實作
 │   │   │   └── exact_store.py    # 精確搜尋，指標測試基準
 │   │   ├── profiling/
 │   │   │   ├── psutil_profiler.py # 系統記憶體與 RSS 取樣
 │   │   │   └── tegra_profiler.py # tegrastats、torch.cuda（Jetson 用）
-│   │   ├── prompts/
-│   │   │   └── yaml_store.py     # 依名稱與版本讀取 prompts/
+│   │   ├── prompts.py            # 依名稱與版本讀取 prompts/
 │   │   └── storage/
 │   │       ├── jsonl_repo.py     # 讀寫 JSONL 資料
 │   │       └── manifest.py       # 內容 hash、環境與版本紀錄
@@ -748,8 +748,11 @@ uv run memrag embed "こんにちは" --model ruri-v3-130m --kind query --explai
 uv run memrag dataset validate                # 標準答案的格式與一致性檢查、統計
 uv run memrag dataset show-query q_p01_05     # 查看一題與它的相關事實
 uv run memrag dataset agreement               # 兩次標註的 Cohen's κ
-uv run memrag eval run --models all --split dev # 檢索準確度（目前以 Gold Facts 當記憶庫，精確搜尋）
-uv run memrag summarize tests/fixtures/dialogue_ja_001.json --json
+uv run memrag dialogues validate              # 每筆 Gold Fact 在正確的人、正確的日期出現一次
+uv run memrag summarize d_p01_1027 --show-retries # 總結一場對話，列出每次嘗試與驗證錯誤
+uv run memrag corpus build                    # 總結全部對話並凍結到 data/02_memories（Nano，用 nano_llm_session.sh）
+uv run memrag eval run --models all --split dev --corpus memories # 檢索準確度（gold：事實原文；memories：LLM 記憶）
+uv run memrag eval rescore results/runs/&lt;run_id&gt; # 標註更新後，沿用存下的向量重算
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
 uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
@@ -987,7 +990,8 @@ ruri-v3-130m:
         <h4>假對話生成</h4>
         <ul>
           <li>以「人物設定＋Gold Facts → 對話」的順序生成，<strong>事實先於對話</strong>，避免 Ground Truth 循環依賴</li>
-          <li>目標規模（5.1.2 實測後調整）：20 人、約 300 場對話、約 1,500–3,000 筆記憶</li>
+          <li>規模（2026-11-07 依 5.1.3 的 Gold Facts 調整）：20 人、390 場對話（每人每天一場，每場 1–2 筆事實）。原訂約 1,500–3,000 筆記憶，因為事實只有 400 筆，實際記憶約 400–500 筆</li>
+          <li>撰寫者（D4）：Claude 依人物設定與事實撰寫；部分日期用「昨日」「来週の日曜日」等相對說法，測試總結時的日期換算；閒聊不加入新的個人資訊，以免產生沒有標註的記憶</li>
           <li>刻意加入干擾：不同人的相似內容、事實更新（喜好改變）、閒聊雜訊</li>
           <li>固定亂數種子；全部使用虛構資料與日文對話</li>
         </ul>
@@ -1014,11 +1018,13 @@ ruri-v3-130m:
           <li>語意：<code>person_id</code> 確實出現在該 Log；<code>source_turn_ids</code> 存在；日期在合理範圍；<code>content</code> 非空、不超過上限且含假名（擋下被翻成中文的輸出）；相同內容去重</li>
           <li>重試：最多 3 次，把驗證錯誤回饋給 LLM；網路錯誤採指數退避；記錄每次原始輸出</li>
           <li>快取：以 <code>hash(輸入對話 + prompt 全文 + 模型 + 參數)</code> 做 key，參數包含 temperature、seed 與輸出 Schema。任何一項改變就重新呼叫 LLM；驗證失敗的輸出不重用</li>
-          <li>LLM：自行啟動獨立的 <code>llama-server</code> 實例（不共用 :8090 的服務），並驗證 JSON Schema 約束輸出是否可用</li>
+          <li>LLM：自行啟動獨立的 <code>llama-server</code> 實例（:8095，不共用 :8090 的服務，<code>scripts/nano_llm_session.sh</code>），並驗證 JSON Schema 約束輸出是否可用</li>
+          <li>對應 Gold Fact：對話的 <code>fact_turns</code> 記錄每筆事實在哪幾句；記憶引用的句子（<code>source_turn_ids</code>）落在哪筆事實的句子，就對應到那筆事實。記憶繼承來源事實的最高分，作為 5.1.8 的 Qrels</li>
         </ul>
         <dl class="outcome">
           <div><dt>驗收</dt><dd>數值暫定：最終成功率 ≥ 99%；第一次通過率 ≥ 90%；Gold Fact 覆蓋率 ≥ 90%，未覆蓋項目逐筆列出；重試與失敗路徑都有測試；語料凍結並記錄 hash。</dd></div>
-          <div><dt>手動測試</dt><dd><code>memrag summarize &lt;log.json&gt; --json --show-retries</code></dd></div>
+          <div><dt>狀態</dt><dd>驗收項目全部達成（run_id <code>20261107-231513_summarize</code>）。390 場對話全部成功、第一次就通過；641 筆記憶，Gold Fact 覆蓋率 98%，未覆蓋的 8 筆列在 <code>data/02_memories/corpus_manifest.json</code>；語料 sha256 <code>2bd13bef…</code>。總結品質：類別 75%、有日期事實的 <code>event_date</code> 77% 與事實一致，16% 的記憶留著相對日期，這些錯誤不修正。<code>summarize.v1</code> 已凍結。</dd></div>
+          <div><dt>手動測試</dt><dd><code>memrag dialogues validate</code>、<code>memrag summarize &lt;log_id&gt; --show-retries</code>、<code>memrag corpus build --limit 17</code></dd></div>
         </dl>
       </article>
 
@@ -1181,7 +1187,14 @@ ruri-v3-130m:
           <li>5.1.4 完成後，用 LLM 總結出的記憶再跑一次，比較兩者的排名是否一致</li>
         </ul>
         <dl class="outcome">
-          <div><dt>狀態</dt><dd>預評估完成（run_id <code>20261107-221101_retrieval_eval</code>）。只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge-base-zh-v1.5 0.780；前四名信賴區間重疊。指標函式通過手算案例，與 <code>ranx</code> 的交叉驗證、閾值校準、HNSW 與測試集評估還沒做。</dd></div>
+          <div><dt>狀態</dt><dd>開發集在兩種記憶庫都評估完成。
+            <ul>
+              <li><strong>Gold Facts 記憶庫</strong>（run_id <code>20261107-221101_retrieval_eval</code>），只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge-base-zh-v1.5 0.780</li>
+              <li><strong>LLM 記憶庫</strong>（5.1.4 的 641 筆，run_id <code>20261107-235108_retrieval_eval_memories</code>，池化後重算 <code>20261107-235741_retrieval_rescore</code>）：ruri-v3-310m 0.902、ruri-v3-130m 0.888、ruri-v3-30m 0.868、Qwen3 0.851、e5-small 0.751、bge-base-zh-v1.5 0.680</li>
+              <li>兩種記憶庫的排名一致，前四名的信賴區間重疊；LLM 記憶庫上日期／類別過濾會擋掉 metadata 有誤的正確記憶，時間題約 0.6（Gold Facts 上是 1.0）</li>
+              <li><strong>池化審查（2026-11-08 完成，開發集）：</strong>每題取 6 個模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶重新判斷，寫在 <code>data/02_memories/pool_labels.jsonl</code>；35 組調高、8 組調低</li>
+              <li>指標函式通過手算案例；與 <code>ranx</code> 的交叉驗證、閾值校準、小候選集、HNSW 與測試集評估還沒做</li>
+            </ul></dd></div>
         </dl>
       </article>
 
@@ -1375,7 +1388,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
         <p><a href="https://docs.trychroma.com/docs/querying-collections/metadata-filtering">Chroma Metadata Filtering</a></p>
         <p>Jetson PyTorch（社群資料有分歧，本計畫以 Nano 實測結果為準）：<a href="https://forums.developer.nvidia.com/t/how-do-i-correctly-install-pytorch-on-jetpack-7-2/372773">JetPack 7.2 安裝討論</a>、<a href="https://github.com/iuliaferoli/jetson-jp7.2-install">jetson-jp7.2-install</a>、<a href="https://johnnynunez.github.io/projects/jetson-sbsa-pytorch">Jetson SBSA PyTorch Wheels</a></p>
       </div>
-      <p class="foot">本頁內容對應 <code>PROJECT_PLAN.md</code> v0.14，門檻與權重均為暫定值，需在 5.1.8 開跑前凍結。</p>
+      <p class="foot">本頁內容對應 <code>PROJECT_PLAN.md</code> v0.15，門檻與權重均為暫定值，需在 5.1.8 開跑前凍結。</p>
     </section>
   </main>
 </div>
@@ -1389,43 +1402,44 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
 </div>
 
 <script id="report-data" type="application/json">{"overview":{
-  "headline": "首次準確度結果：ruri 系列最好，產品現用的 bge 明顯最差",
-  "summary": "把 400 筆標準事實直接當記憶庫，用開發集 81 題測 6 個模型，只比較 Embedding 本身。只搜本人時，ruri-v3-310m 的 nDCG@10 最高（0.945），ruri-v3-30m 與 Qwen3 和它的差距不顯著；產品現用的 bge-base-zh-v1.5 只有 0.780。這是初步結果：還沒用 LLM 總結出來的記憶，也還沒用測試集。",
-  "conclusion": "尚未選型。初步排名：ruri-v3-310m ≥ ruri-v3-30m ≈ Qwen3-Embedding-0.6B ≈ ruri-v3-130m > multilingual-e5-small > bge-base-zh-v1.5（對照組）。",
+  "headline": "換成 LLM 實際總結的記憶後，排名不變：ruri 系列最好，產品現用的 bge 明顯最差",
+  "summary": "記憶改用 Qwen3-4B 實際總結出來的 641 筆（含漏記、雜訊、類別與日期錯誤），用開發集 81 題測 6 個模型。只搜本人時，ruri-v3-310m 的 nDCG@10 最高（0.902），ruri-v3-130m、ruri-v3-30m、Qwen3 和它的差距不顯著；產品現用的 bge-base-zh-v1.5 只有 0.680。排名和用標準事實當記憶庫時一致。測試集與閾值評估還沒做。",
+  "conclusion": "尚未選型。初步排名：ruri-v3-310m ≥ ruri-v3-130m ≈ ruri-v3-30m ≈ Qwen3-Embedding-0.6B > multilingual-e5-small > bge-base-zh-v1.5（對照組）。ruri-v3-310m 在兩種記憶庫都是第一，對表記差異與雜訊最穩。",
   "findings": [
-    "只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge 0.780；前四名的信賴區間重疊，還要更多資料才分得出來。",
-    "差距最大的是表記差異題（漢字、平假名、簡稱）：ruri-v3-130m／310m 約 0.96，bge 只有 0.66。",
-    "不加 person_id 過濾時，26%–49% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
-    "時間與類別的問題只靠 Embedding 找不到（nDCG@10 0.04–0.25），套上日期／類別過濾後 6 個模型都是 1.0；這類問題要靠 metadata。",
-    "效能上 6 個模型在 Nano GPU 的單句延遲都在 84 ms 內，記憶體峰值都在 1.7 GiB 內；ruri-v3-30m 速度最快，準確度和 310m 的差距不顯著，是輕量的選項。"
+    "LLM 總結的記憶庫，只搜本人時 nDCG@10：ruri-v3-310m 0.902、ruri-v3-130m 0.888、ruri-v3-30m 0.868、Qwen3 0.851、e5-small 0.751、bge 0.680；前四名的信賴區間重疊。",
+    "記憶變雜之後所有模型下降 0.03–0.12，表記差異題落差最大；ruri-v3-310m 最穩（0.956 → 0.902），Qwen3 退步最多（0.852 → 0.678）。",
+    "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別只有 75%、日期 77% 正確，過濾會擋掉正確的記憶，時間題從標準事實的 1.0 掉到 0.6 左右。",
+    "總結用 LLM：Nano 現有的 Qwen3-1.7B、Qwen3.5-2B 寫不出可用的日文；改用 Qwen3-4B-Instruct-2507，390 場對話全部總結成功，覆蓋 98% 的事實。",
+    "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
+    "效能上 6 個模型在 Nano GPU 的單句延遲都在 84 ms 內，記憶體峰值都在 1.7 GiB 內；ruri-v3-30m 最快，ruri-v3-130m 的準確度接近 310m、延遲約一半。"
   ],
   "comparison": {
-    "caption": "模型比較總表（2026-11-07）",
-    "columns": ["模型", "角色", "nDCG@10（只搜本人）", "Recall@5", "表記差異題 nDCG", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
+    "caption": "模型比較總表（2026-11-08）",
+    "columns": ["模型", "角色", "nDCG@10（LLM 記憶庫）", "nDCG@10（標準事實）", "表記差異題（LLM 記憶庫）", "公開日文檢索分數", "GPU 單句 p95", "GPU 記憶體峰值", "CPU 單句 p95"],
     "numeric": [2, 3, 4, 5, 6, 7, 8],
     "rows": [
-      ["ruri-v3-310m", "候選", "0.945", "0.968", "0.956", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
-      ["ruri-v3-30m", "候選", "0.931", "0.948", "0.874", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
-      ["Qwen3-Embedding-0.6B", "候選", "0.921", "0.945", "0.852", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
-      ["ruri-v3-130m", "候選", "0.920", "0.964", "0.963", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
-      ["multilingual-e5-small", "候選", "0.871", "0.899", "0.714", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
-      ["bge-base-zh-v1.5", "對照組（產品現用）", "0.780", "0.849", "0.664", "—", "20.0 ms", "734 MiB", "104.6 ms"]
+      ["ruri-v3-310m", "候選", "0.902", "0.945", "0.902", "83.98", "39.9 ms", "1,450 MiB", "172.5 ms"],
+      ["ruri-v3-130m", "候選", "0.888", "0.920", "0.877", "83.80", "30.9 ms", "917 MiB", "77.6 ms"],
+      ["ruri-v3-30m", "候選", "0.868", "0.931", "0.792", "81.94", "17.9 ms", "938 MiB", "23.1 ms"],
+      ["Qwen3-Embedding-0.6B", "候選", "0.851", "0.921", "0.678", "80.30", "83.6 ms", "1,356 MiB", "435.4 ms"],
+      ["multilingual-e5-small", "候選", "0.751", "0.871", "0.609", "72.71", "19.8 ms", "1,688 MiB", "37.9 ms"],
+      ["bge-base-zh-v1.5", "對照組（產品現用）", "0.680", "0.780", "0.577", "—", "20.0 ms", "734 MiB", "104.6 ms"]
     ],
-    "note": "準確度：開發集 73 題有答案的問題，記憶庫是 400 筆標準事實原文，只搜該使用者的記憶，精確搜尋；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
+    "note": "準確度：開發集 73 題有答案的問題，只搜該使用者的記憶，精確搜尋，信賴區間約 ±0.04–0.05。「LLM 記憶庫」是 Qwen3-4B 總結 390 場模擬對話得到的 641 筆記憶，經池化審查補判；「標準事實」是 400 筆事實原文。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "5.1.4：用 Qwen3-1.7B 產生模擬對話並總結成記憶 JSON，用相同評估看真實總結下排名是否改變。",
-    "5.1.8：閾值校準與小候選集誤擋率；最後用測試集 120 題做正式評估。"
+    "5.1.8：閾值校準與小候選集（2–10 筆）誤擋率；最後用測試集 120 題做正式評估。",
+    "5.1.6：決定 metadata 可能出錯時，日期／類別過濾要怎麼用。"
   ],
   "tasks": [
     { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成" },
     { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：首輪名單與效能量測" },
     { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "完成：201 題測試問題與標準答案，κ 0.90" },
-    { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "尚未開始" },
-    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（這次先用精確搜尋）" },
+    { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "完成：390 場對話、641 筆記憶（Qwen3-4B），覆蓋 98%" },
+    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "尚未開始（評估目前用精確搜尋）" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
-    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "進行中：開發集初步結果（標準事實當記憶庫）" },
+    { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "進行中：開發集在兩種記憶庫的結果；閾值與測試集未做" },
     { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "尚未開始" }
   ]
 }
@@ -1744,6 +1758,169 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   ],
   "related": [
     { "id": "2026-11-07_load-probe", "relation": "同一批模型的效能量測" }
+  ]
+}
+},{"id":"2026-11-07_summarizer-llm-corpus","record":{
+  "title": "總結用 LLM 試用與記憶語料",
+  "date": "2026-11-07",
+  "task": "5.1.4",
+  "type": "模型篩選",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "Nano 上的本地 LLM 能不能寫出可用的日文對話、把對話總結成記憶 JSON？用哪個模型產生 5.1.8 要評估的記憶語料？",
+  "environment": [
+    "robo@172.28.0.147（Jetson Orin Nano），自己啟動的 llama-server（:8095，llama.cpp 0.8.0-dev），不共用 :8090 的服務",
+    "Qwen3-4B-Instruct-2507-Q4_K_M（unsloth，revision a06e946b，Apache-2.0），temperature 0、seed 42、JSON Schema 限制輸出、關閉思考模式",
+    "總結期間由 nano_llm_session.sh 暫停常駐服務（23:15–23:48），結束後重啟並確認 /health 回 200",
+    "run_id 20261107-231513_summarize；語料 sha256 2bd13bef…；git commit：N/A（尚未提交）"
+  ],
+  "method": [
+    "試用：Nano 已有的 Qwen3-1.7B、Qwen3.5-2B（Q4_K_M）各用 4 筆事實試寫對話並總結",
+    "對話：依使用者決定改由 Claude 撰寫 390 場（每人每天一場、每場 1–2 筆事實），memrag dialogues validate 確認每筆事實只在正確的人、正確的日期出現一次",
+    "總結：memrag corpus build，prompt summarize.v1（先用 p01 的 17 場試跑，依結果微調一次後凍結）",
+    "對應：記憶引用的句子落在哪筆事實的句子，就對應到那筆事實"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "caption": "本地 LLM 試用",
+      "columns": ["模型", "大小", "寫對話", "總結", "結論"],
+      "rows": [
+        ["Qwen3-1.7B", "1.1 GB", "日文不自然、漏掉事實、事實由機器人說出", "會漏記，出現「佐藤さんと会話中」這類無用的記憶", "不採用"],
+        ["Qwen3.5-2B", "1.3 GB", "同一句重複多次、給東京的小孩加上關西腔", "句子較完整，但多出「（ユーザー）」等雜訊", "不採用"],
+        ["Qwen3-4B-Instruct-2507", "2.5 GB", "未試（對話改由 Claude 撰寫）", "可用，見下表", "採用"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "記憶語料（Qwen3-4B 總結 390 場對話）",
+      "columns": ["項目", "結果", "驗收"],
+      "rows": [
+        ["最終成功率", "100%（390／390）", "≥ 99%，通過"],
+        ["第一次通過率", "100%（不需要重試）", "≥ 90%，通過"],
+        ["Gold Fact 覆蓋率", "98%（8 筆沒有對應的記憶）", "≥ 90%，通過"],
+        ["記憶數", "641 筆，其中 210 筆沒有對應到事實", "—"],
+        ["category 與事實一致", "75%", "—"],
+        ["有日期的事實，event_date 正確", "77%", "—"],
+        ["content 留著相對日期", "16%（例：「来月の十五日」）", "—"],
+        ["總結速度", "約 5 秒／場，全部 33 分鐘", "—"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "沒有對應的 8 筆事實，多半是同一句裡講了兩件事，只記了一件（例：住在川越與丈夫過世）。",
+        "沒有對應到事實的 210 筆記憶，多半是使用者在事實之後補的感想或細節（例：「浩二の店にアジ二十匹を持っていく」）。這類記憶和事實相關卻沒有分數，所以 5.1.8 做了池化審查補判。",
+        "類別和日期的錯誤不修正，因為這就是實際總結的品質；它會影響「本人＋日期／類別過濾」的結果。"
+      ]
+    }
+  ],
+  "conclusion": [
+    "Nano 現有的 2B 以下模型無法寫出可用的日文；總結改用 Qwen3-4B-Instruct-2507，語料通過 5.1.4 全部驗收並已凍結。",
+    "這份語料代表「4B 級本地模型」的總結品質；正式環境的總結模型確定後，可以用同一套指令重做語料再評估。"
+  ],
+  "next": ["5.1.8：用這份語料評估 6 個 Embedding 模型。"],
+  "sources": [
+    { "text": "data/02_memories/（memories.jsonl、corpus_manifest.json）" },
+    { "text": "data/01_dialogues/dialogues.jsonl" },
+    { "text": "results/runs/20261107-231513_summarize/" }
+  ],
+  "related": [
+    { "id": "2026-11-08_retrieval-eval-memories-dev", "relation": "用這份語料做的準確度評估" }
+  ]
+}
+},{"id":"2026-11-08_retrieval-eval-memories-dev","record":{
+  "title": "準確度評估：LLM 總結的記憶庫（開發集）",
+  "date": "2026-11-08",
+  "task": "5.1.8",
+  "type": "指標評估",
+  "status": "部分完成",
+  "backfilled": false,
+  "purpose": "記憶改成 LLM 實際總結出來的內容後（有漏記、雜訊、類別與日期錯誤），各 Embedding 模型的排名會不會改變？",
+  "environment": [
+    "robo@172.28.0.147（Jetson Orin Nano，CUDA），run_id 20261107-235108_retrieval_eval_memories；池化後重算 20261107-235741_retrieval_rescore（Windows，沿用存下的向量）",
+    "語料 data/02_memories（641 筆，Qwen3-4B 總結，sha256 2bd13bef…）；所有模型 float32，套用模型卡的 prefix",
+    "llama-server 與 pocket_tts_server 由 nano_measure.sh 停止（23:51–23:53），結束後重啟並確認 /health 回 200",
+    "git commit：N/A（尚未提交）"
+  ],
+  "method": [
+    "uv run memrag eval run --models all --split dev --corpus memories；精確 cosine 搜尋，三種範圍同前一次",
+    "記憶的分數：繼承它對應的事實的最高分",
+    "池化審查（計畫 5.1.8）：開發集每題取 6 個模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶，依標註指南重新給 0／1／2 分（35 組調高、8 組調低），再用 memrag eval rescore 重算",
+    "開發集 81 題（有答案 73 題、無答案 8 題）；測試集保留到正式評估"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "caption": "只搜本人：nDCG@10（池化後）與和標準事實記憶庫的比較",
+      "columns": ["模型", "記憶庫 nDCG@10", "95% 信賴區間", "Recall@5", "與最佳的差距", "標準事實記憶庫"],
+      "rows": [
+        ["ruri-v3-310m", "0.902", "0.861–0.939", "0.925", "最佳", "0.945"],
+        ["ruri-v3-130m", "0.888", "0.836–0.932", "0.914", "−0.013，不顯著", "0.920"],
+        ["ruri-v3-30m", "0.868", "0.807–0.919", "0.898", "−0.034，不顯著", "0.931"],
+        ["qwen3-emb-0.6b", "0.851", "0.791–0.903", "0.856", "−0.051，不顯著", "0.921"],
+        ["e5-small", "0.751", "0.675–0.822", "0.762", "−0.151，顯著", "0.871"],
+        ["bge-base-zh-v1.5（對照組）", "0.680", "0.601–0.752", "0.722", "−0.222，顯著", "0.780"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "三種搜尋範圍的 nDCG@10（記憶庫，池化後）",
+      "columns": ["模型", "不過濾（641 筆）", "只搜本人", "本人＋日期／類別"],
+      "rows": [
+        ["ruri-v3-310m", "0.711", "0.902", "0.879"],
+        ["ruri-v3-130m", "0.705", "0.888", "0.883"],
+        ["ruri-v3-30m", "0.685", "0.868", "0.866"],
+        ["qwen3-emb-0.6b", "0.615", "0.851", "0.838"],
+        ["e5-small", "0.523", "0.751", "0.779"],
+        ["bge-base-zh-v1.5（對照組）", "0.422", "0.680", "0.713"]
+      ]
+    },
+    {
+      "kind": "table",
+      "caption": "只搜本人，依問題類型的 nDCG@10（記憶庫，池化後）",
+      "columns": ["模型", "直接問", "換句話說", "表記差異", "指定人物", "時間／類別"],
+      "rows": [
+        ["ruri-v3-310m", "0.945", "0.939", "0.902", "0.928", "0.735"],
+        ["ruri-v3-130m", "0.941", "0.955", "0.877", "0.960", "0.610"],
+        ["ruri-v3-30m", "0.963", "0.928", "0.792", "0.960", "0.601"],
+        ["qwen3-emb-0.6b", "0.978", "0.907", "0.678", "0.945", "0.698"],
+        ["e5-small", "0.957", "0.823", "0.609", "0.871", "0.353"],
+        ["bge-base-zh-v1.5（對照組）", "0.923", "0.670", "0.577", "0.806", "0.281"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "排名和標準事實記憶庫幾乎一樣：ruri 系列前三、Qwen3 第四、e5 與 bge 顯著較差；只有 ruri-v3-30m 和 130m 的順序對調。",
+        "記憶變雜之後，所有模型都下降 0.03–0.12；表記差異題落差最大（ruri-v3-30m 0.874 → 0.792、Qwen3 0.852 → 0.678），ruri-v3-310m 最穩（0.956 → 0.902）。",
+        "日期／類別過濾在真實語料上反而沒有幫助：LLM 有 25% 的類別、23% 的日期和事實不同，過濾會把正確的記憶擋掉；3 題的相關記憶全部被過濾。標準事實記憶庫上過濾後是 1.0，這裡只有 0.57–0.60。",
+        "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶，和前一次一致。",
+        "無答案題第一名分數的 AUC（只搜本人，8 題，僅供參考）：ruri-v3-310m 0.94、ruri-v3-130m 0.94、e5-small 0.89、ruri-v3-30m 0.86、bge 0.85、Qwen3 0.84。"
+      ]
+    },
+    {
+      "kind": "note",
+      "title": "這次結果的限制",
+      "text": "有答案的題目只有 73 題，前四名的信賴區間重疊。池化只看前 5 名，而且由 Claude 判斷，不是日文母語者；池化本身也偏向參與池化的這 6 個模型。語料只代表 Qwen3-4B 的總結品質。閾值校準、小候選集誤擋率、HNSW 與測試集評估還沒做。"
+    }
+  ],
+  "conclusion": [
+    "換成實際總結出來的記憶後，模型排名沒有改變：ruri-v3-310m 仍是第一，ruri-v3-130m、ruri-v3-30m、Qwen3 和它的差距不顯著，e5-small 與產品現用的 bge-base-zh-v1.5 顯著較差。",
+    "ruri-v3-310m 對表記差異和雜訊最穩；ruri-v3-30m 在雜訊下表記差異題退步較多。",
+    "日期與類別過濾的效果取決於總結 LLM 抽 metadata 的準確度；以 4B 模型的品質，直接用過濾會擋掉正確記憶，需要在 5.1.6 決定過濾的用法（例如只用日期、或過濾後不足時放寬）。"
+  ],
+  "next": [
+    "5.1.8：閾值校準與小候選集（2–10 筆）誤擋率；最後用測試集 120 題做正式評估。",
+    "5.1.6：決定日期／類別過濾在 metadata 可能出錯時的用法。"
+  ],
+  "sources": [
+    { "text": "results/runs/20261107-235108_retrieval_eval_memories/、results/runs/20261107-235741_retrieval_rescore/" },
+    { "text": "data/02_memories/pool_labels.jsonl（池化審查的 400 組判斷）" }
+  ],
+  "related": [
+    { "id": "2026-11-07_retrieval-eval-gold-dev", "relation": "同一批題目在標準事實記憶庫上的結果" },
+    { "id": "2026-11-07_summarizer-llm-corpus", "relation": "這次使用的記憶語料" }
   ]
 }
 }]}</script>

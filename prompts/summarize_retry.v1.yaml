@@ -1,6 +1,6 @@
 name: summarize_retry
 version: v1
-status: draft
+status: frozen  # 2026-11-07: used for data/02_memories (no retries were needed)
 purpose: 摘要輸出驗證失敗時，接在原本的 summarize 訊息後面要求修正
 used_by: src/memrag/application/summarize.py
 task: "5.1.4"

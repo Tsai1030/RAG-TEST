@@ -2,7 +2,7 @@
 
 | 項目 | 內容 |
 |---|---|
-| 版本 / 日期 | v0.14（草案）/ 2026-11-07 |
+| 版本 / 日期 | v0.15（草案）/ 2026-11-08 |
 | 執行平台 | 開發與測試：NVIDIA Jetson Orin Nano Super（GPU）；Windows 筆電僅用於開發與遠端操作。正式部署：自架伺服器（預計在 AWS），不使用外部 API（D2） |
 | 最終交付 | Embedding 模型選型決策、可重現的完整 RAG pipeline、Python Library 與手動測試介面、測試結果網頁 |
 | 估計工時 | 約 21.5 人天（估計值，開始日期待定） |
@@ -66,7 +66,7 @@
 | D1 | GPU 記憶體數據這樣呈現可以嗎？ | Nano 沒有獨立 VRAM，改報 PyTorch GPU 配置峰值與系統記憶體增量 | 原排程的 VRAM 欄位將採用這個定義 |
 | D2 | 最終部署硬體也是這台 Nano 嗎？ | **已確認不是（2026-11-07）。** 正式部署在自架伺服器（預計在 AWS），自行執行開源模型，不使用外部 API | 檢索品質的結果直接適用。Nano 改為開發與測試平台，它的延遲與記憶體數字只作模型間的相對比較；正式數字要在部署伺服器重測。硬性門檻與權重已依此調整（見 5.1.9） |
 | D3 | 系統是否會商用？ | **已確認會商用（2026-11-07）** | 非商用授權的模型不可入選；Sarashina 因此排除 |
-| D4 | 生成與摘要使用哪個 LLM？ | Nano 上以 llama.cpp 跑 `Qwen3-1.7B-Q4_K_M`（這台已有常駐服務以 `-ngl 99` 載入此模型）；假對話量大，先測速度，不夠快才改雲端 API；測試用 Replay | 日文摘要品質與速度都還沒驗證，於 5.1.4 實測。正式環境的當日對話總結也是自架 LLM（D2）；測試語料最好用與正式環境相近的模型產生，否則記憶的寫法會和上線時不同 |
+| D4 | 生成與摘要使用哪個 LLM？ | **已確認（2026-11-07）：** 對話由 Claude 撰寫；總結用 Nano 上自己啟動的 `Qwen3-4B-Instruct-2507`（Q4_K_M，Apache-2.0），執行時暫停常駐服務。Nano 現有的 `Qwen3-1.7B`、`Qwen3.5-2B` 試寫時日文不自然、會漏掉事實，不採用 | 正式環境的總結模型還沒決定（自架，D2）；這次的語料代表「4B 級本地模型」的總結品質。正式模型確定後，可用同一套 `memrag corpus build` 重做語料再評估 |
 | D5 | 回答階段的 LLM 為何？ | 與 D4 相同 | 影響 5.1.7 的 LLM 延遲是否有代表性 |
 | D6 | 除日文外還要測哪些語言？ | **已確認只做日文（2026-11-07）** | 不製作其他語言與跨語言資料；多語模型仍可當候選，但只評估日文表現 |
 | D7 | 誰負責第二位標註與日文審閱？ | **已確認由 Claude 負責（2026-11-07）**，做法見 5.1.3 | 不是人類母語者審閱，這項限制要寫進選型報告 |
@@ -204,7 +204,8 @@ RAG TEST/
 │   │   │   ├── dialogue.py       # DialogueLog, Turn
 │   │   │   ├── memory.py         # MemoryDraft（LLM 輸出）, MemoryRecord, Category
 │   │   │   ├── retrieval.py      # MemoryFilter, SearchHit, Answer
-│   │   │   └── evaluation.py     # Persona, GoldFact, TestQuery, QueryLabel
+│   │   │   ├── prompt.py         # PromptTemplate：代入變數、內容 hash
+│   │   │   └── evaluation.py     # Persona, GoldFact, TestQuery, QueryLabel, MemoryLabel（池化審查）
 │   │   ├── metrics/
 │   │   │   ├── retrieval.py      # Recall@k, MRR, nDCG
 │   │   │   └── statistics.py     # Cohen's κ、bootstrap 信賴區間、AUC
@@ -212,8 +213,8 @@ RAG TEST/
 │   │   └── errors.py             # 領域錯誤類別
 │   │
 │   ├── application/              # 【第 2 層】Use cases
-│   │   ├── generate_dialogues.py # 人物設定 + Gold Facts → 假對話
-│   │   ├── summarize.py          # 結構化輸出 → 驗證 → 重試
+│   │   ├── generate_dialogues.py # 人物設定 + Gold Facts → 假對話（這輪對話由 Claude 撰寫，未實作）
+│   │   ├── summarize.py          # 結構化輸出 → 驗證 → 重試 → 對應 Gold Fact
 │   │   ├── ingest.py             # 記憶 → 向量 → 儲存
 │   │   ├── retrieve.py           # 過濾檢索
 │   │   ├── context_build.py      # 閾值後的記憶 → 送給 LLM 的文字
@@ -221,8 +222,9 @@ RAG TEST/
 │   │   ├── pipeline.py           # 串接全流程
 │   │   └── evaluation/
 │   │       ├── dataset_check.py  # 標準答案檢查、切分、抽樣、標註一致度
-│   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：三種過濾範圍、逐題指標、配對比較
-│   │       ├── qrels.py          # 編譯 Qrels
+│   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：兩種記憶庫、三種過濾範圍、逐題指標、配對比較
+│   │       ├── corpus_check.py   # 對話檢查、記憶語料的驗收數字
+│   │       ├── qrels.py          # 編譯 Qrels（目前在 retrieval_eval.py 內：記憶繼承事實分數＋池化判斷）
 │   │       ├── metric_runner.py  # 模型 × 設定 測試矩陣
 │   │       ├── profile_runner.py # 各階段延遲與記憶體量測
 │   │       ├── thresholds.py     # 閾值校準與小候選集評估
@@ -237,18 +239,16 @@ RAG TEST/
 │   │   │   ├── probe.py          # 獨立子行程量測載入、記憶體與延遲
 │   │   │   └── fake.py           # 測試用確定性向量
 │   │   ├── llm/
-│   │   │   ├── openai_compatible.py # 呼叫 OpenAI 相容 API
-│   │   │   ├── llama_cpp.py      # 啟動與管理本專案的 llama-server
-│   │   │   ├── replay.py         # 重播已錄製回應，測試免呼叫 LLM
-│   │   │   └── fake.py           # 測試用固定回應
+│   │   │   ├── llama_server.py   # 呼叫 llama-server 的 OpenAI 相容 API（啟動由 scripts/nano_llm_session.sh 負責）
+│   │   │   ├── cache.py          # 通過驗證的輸出快取，重跑免呼叫 LLM
+│   │   │   └── fake.py           # 測試用：固定回應，或把使用者發言當記憶
 │   │   ├── vectorstore/
 │   │   │   ├── chroma_store.py   # ChromaDB 內嵌模式實作
 │   │   │   └── exact_store.py    # 精確搜尋，指標測試基準
 │   │   ├── profiling/
 │   │   │   ├── psutil_profiler.py # 系統記憶體與 RSS 取樣
 │   │   │   └── tegra_profiler.py # tegrastats、torch.cuda（Jetson 用）
-│   │   ├── prompts/
-│   │   │   └── yaml_store.py     # 依名稱與版本讀取 prompts/
+│   │   ├── prompts.py            # 依名稱與版本讀取 prompts/
 │   │   └── storage/
 │   │       ├── jsonl_repo.py     # 讀寫 JSONL 資料
 │   │       └── manifest.py       # 內容 hash、環境與版本紀錄
@@ -381,8 +381,11 @@ uv run memrag embed "こんにちは" --model ruri-v3-130m --kind query --explai
 uv run memrag dataset validate                # 標準答案的格式與一致性檢查、統計
 uv run memrag dataset show-query q_p01_05     # 查看一題與它的相關事實
 uv run memrag dataset agreement               # 兩次標註的 Cohen's κ
-uv run memrag eval run --models all --split dev # 檢索準確度（目前以 Gold Facts 當記憶庫，精確搜尋）
-uv run memrag summarize tests/fixtures/dialogue_ja_001.json --json
+uv run memrag dialogues validate              # 每筆 Gold Fact 在正確的人、正確的日期出現一次
+uv run memrag summarize d_p01_1027 --show-retries # 總結一場對話，列出每次嘗試與驗證錯誤
+uv run memrag corpus build                    # 總結全部對話並凍結到 data/02_memories（Nano，用 nano_llm_session.sh）
+uv run memrag eval run --models all --split dev --corpus memories # 檢索準確度（gold：事實原文；memories：LLM 記憶）
+uv run memrag eval rescore results/runs/<run_id> # 標註更新後，沿用存下的向量重算
 uv run memrag ingest data/01_dialogues --model ruri-v3-130m
 uv run memrag search "好きな食べ物" --person p001 --category preference --from 2026-01-01 -k 5
 uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
@@ -614,7 +617,8 @@ LLM 只輸出前 5 個欄位（`MemoryDraft`），其餘由程式補上。`impor
 **假對話生成**
 
 - 以「人物設定＋Gold Facts → 對話」的順序生成，**事實先於對話**，避免 Ground Truth 循環依賴
-- 目標規模（5.1.2 實測後調整）：20 人、約 300 場對話、約 1,500–3,000 筆記憶
+- 規模（2026-11-07 依 5.1.3 的 Gold Facts 調整）：20 人、390 場對話（每人每天一場，每場 1–2 筆事實）。原訂約 1,500–3,000 筆記憶，因為事實只有 400 筆，實際記憶約 400–500 筆
+- 撰寫者（D4）：Claude 依人物設定與事實撰寫；部分日期用「昨日」「来週の日曜日」等相對說法，測試總結時的日期換算；閒聊不加入新的個人資訊，以免產生沒有標註的記憶
 - 刻意加入干擾：不同人的相似內容、事實更新（喜好改變）、閒聊雜訊
 - 固定亂數種子；全部使用虛構資料與日文對話
 
@@ -646,11 +650,14 @@ flowchart LR
 - 語意：`person_id` 確實出現在該 Log；`source_turn_ids` 存在；日期在合理範圍；`content` 非空、不超過上限且含假名（擋下被翻成中文的輸出）；相同內容去重
 - 重試：最多 3 次，把驗證錯誤回饋給 LLM；網路錯誤採指數退避；記錄每次原始輸出
 - 快取：以 `hash(輸入對話 + prompt 全文 + 模型 + 參數)` 做 key，參數包含 temperature、seed 與輸出 Schema。任何一項改變就重新呼叫 LLM；驗證失敗的輸出不重用
-- LLM：自行啟動獨立的 `llama-server` 實例（不共用 :8090 的服務），並驗證 JSON Schema 約束輸出是否可用
+- LLM：自行啟動獨立的 `llama-server` 實例（:8095，不共用 :8090 的服務，`scripts/nano_llm_session.sh`），並驗證 JSON Schema 約束輸出是否可用
+- 對應 Gold Fact：對話的 `fact_turns` 記錄每筆事實在哪幾句；記憶引用的句子（`source_turn_ids`）落在哪筆事實的句子，就對應到那筆事實。記憶繼承來源事實的最高分，作為 5.1.8 的 Qrels
 
 **驗收（數值暫定）：** 最終成功率 ≥ 99%；第一次通過率 ≥ 90%；Gold Fact 覆蓋率 ≥ 90%，未覆蓋項目逐筆列出；重試與失敗路徑都有測試；語料凍結並記錄 hash。
 
-**手動測試：** `memrag summarize <log.json> --json --show-retries`
+**狀態：** 驗收項目全部達成（run_id `20261107-231513_summarize`）。390 場對話全部成功、第一次就通過；641 筆記憶，Gold Fact 覆蓋率 98%，未覆蓋的 8 筆列在 `data/02_memories/corpus_manifest.json`；語料 sha256 `2bd13bef…`。總結品質：類別 75%、有日期事實的 `event_date` 77% 與事實一致，16% 的記憶留著相對日期，這些錯誤不修正。`summarize.v1` 已凍結。
+
+**手動測試：** `memrag dialogues validate`、`memrag summarize <log_id> --show-retries`、`memrag corpus build --limit 17`
 
 ### 5.1.5 Vector DB Setup & Filtered Retrieval
 
@@ -802,7 +809,13 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 - 指標：nDCG@10、Recall@k、MRR@10，以及 Bootstrap 95% 信賴區間與逐題配對比較；無答案題只算第一名分數的 AUC，正式的閾值指標之後再做
 - 5.1.4 完成後，用 LLM 總結出的記憶再跑一次，比較兩者的排名是否一致
 
-**狀態：** 預評估完成（run_id `20261107-221101_retrieval_eval`）。只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge-base-zh-v1.5 0.780；前四名信賴區間重疊。指標函式通過手算案例，與 `ranx` 的交叉驗證、閾值校準、HNSW 與測試集評估還沒做。
+**狀態：** 開發集在兩種記憶庫都評估完成。
+
+- **Gold Facts 記憶庫**（run_id `20261107-221101_retrieval_eval`），只搜本人時 nDCG@10：ruri-v3-310m 0.945、ruri-v3-30m 0.931、Qwen3 0.921、ruri-v3-130m 0.920、e5-small 0.871、bge-base-zh-v1.5 0.780
+- **LLM 記憶庫**（5.1.4 的 641 筆，run_id `20261107-235108_retrieval_eval_memories`，池化後重算 `20261107-235741_retrieval_rescore`）：ruri-v3-310m 0.902、ruri-v3-130m 0.888、ruri-v3-30m 0.868、Qwen3 0.851、e5-small 0.751、bge-base-zh-v1.5 0.680
+- 兩種記憶庫的排名一致，前四名的信賴區間重疊；LLM 記憶庫上日期／類別過濾會擋掉 metadata 有誤的正確記憶，時間題約 0.6（Gold Facts 上是 1.0）
+- **池化審查（2026-11-08 完成，開發集）：** 每題取 6 個模型前 5 名（無答案題前 3 名），對沒有對應到事實或繼承了分數的 400 組記憶重新判斷，寫在 `data/02_memories/pool_labels.jsonl`；35 組調高、8 組調低
+- 指標函式通過手算案例；與 `ranx` 的交叉驗證、閾值校準、小候選集、HNSW 與測試集評估還沒做
 
 ### 5.1.9 Result Analysis & Embedding Model Selection
 

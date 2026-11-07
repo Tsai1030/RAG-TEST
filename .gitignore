@@ -6,4 +6,6 @@ __pycache__/
 .import_linter_cache/
 .hf_cache/
 results/runs/
+results/llm_cache/
+results/service_logs/
 .env

@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SKIP_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".hf_cache",
              ".import_linter_cache"}
 # generated; described in results/README.md
-SKIP_PATHS = {ROOT / "results" / "runs", ROOT / "results" / "service_logs"}
+SKIP_PATHS = {ROOT / "results" / "runs", ROOT / "results" / "service_logs", ROOT / "results" / "llm_cache"}
 
 
 def _folders():

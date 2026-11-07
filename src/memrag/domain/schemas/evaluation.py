@@ -100,3 +100,16 @@ class QueryLabel(_Strict):
     fact_id: str
     grade: int = Field(ge=1, le=2)
     annotator: str
+
+
+class MemoryLabel(_Strict):
+    """A pooled judgement of one summarized memory for one query (5.1.8 pooling).
+
+    It overrides the grade the memory inherits from its gold facts, so grade 0 is
+    allowed: it records that an inherited grade was too high.
+    """
+
+    query_id: str
+    memory_id: str
+    grade: int = Field(ge=0, le=2)
+    annotator: str

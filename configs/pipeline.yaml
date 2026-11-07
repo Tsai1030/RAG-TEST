@@ -1,0 +1,20 @@
+# Pipeline settings (plan 5.1.4–5.1.6). Paths are relative to the project root.
+
+llm:
+  # Our own llama-server instance on the Nano (not the shared :8090 service); see scripts/nano_llm.sh.
+  # Chosen 2026-11-07: Qwen3-1.7B and Qwen3.5-2B wrote unusable Japanese in the feasibility check.
+  base_url: http://127.0.0.1:8095
+  hf_id: unsloth/Qwen3-4B-Instruct-2507-GGUF
+  revision: a06e946bb6b655725eafa393f4a9745d460374c9
+  file: Qwen3-4B-Instruct-2507-Q4_K_M.gguf
+  license: apache-2.0
+  context: 8192
+  temperature: 0.0
+  seed: 42
+  max_tokens: 2048
+
+summarize:
+  prompt_version: v1
+  cache_dir: results/llm_cache
+
+refusal_text: 関連する情報はありません

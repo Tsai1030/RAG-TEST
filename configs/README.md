@@ -8,6 +8,7 @@
 |---|---|---|---|---|
 | `README.md` | 檔案 | 本文件：說明這個資料夾的內容 | 手動維護 | 是 |
 | `models.yaml` | 檔案 | 模型 registry：Hugging Face ID、固定的 revision、維度、prefix、精度、授權 | 手動維護，修改後要跑 `uv run pytest tests/contract` | 是 |
+| `pipeline.yaml` | 檔案 | 流程設定：總結用 LLM（自己的 llama-server 位址、GGUF 的 revision、temperature、seed）、prompt 版本、快取位置、拒答文字 | 手動維護；改 LLM 或參數後快取自動失效 | 是 |
 
 ## models.yaml 欄位
 

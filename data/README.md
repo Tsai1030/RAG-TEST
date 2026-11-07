@@ -8,3 +8,5 @@
 |---|---|---|---|---|
 | `README.md` | 檔案 | 本文件：說明這個資料夾的內容 | 手動維護 | 是 |
 | `00_gold/` | 資料夾 | 5.1.3 的標準答案：人物設定、Gold Facts、測試問題與標註，說明見 [`00_gold/README.md`](00_gold/README.md) | — | 是 |
+| `01_dialogues/` | 資料夾 | 5.1.4 的模擬對話，說明見 [`01_dialogues/README.md`](01_dialogues/README.md) | — | 是 |
+| `02_memories/` | 資料夾 | 5.1.4 凍結的記憶語料與 5.1.8 的池化審查標註，說明見 [`02_memories/README.md`](02_memories/README.md) | — | 是 |

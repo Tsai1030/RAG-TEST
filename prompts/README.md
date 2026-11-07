@@ -6,14 +6,14 @@
 prompt = prompt_store.get("summarize", version="v1")
 ```
 
-讀取程式 `PromptStore` 尚未實作，規劃見計畫書第 4、5 節。目前四份都是草稿（`status: draft`），還沒有用真實 LLM 測過。
+讀取程式是 `src/memrag/infrastructure/prompts.py`（`YamlPromptStore`）。`summarize` 與 `summarize_retry` 已用 Qwen3-4B 實測（5.1.4）；`dialogue_generate` 這輪沒有使用，因為對話改由 Claude 撰寫（計畫書 D4）；`answer` 在 5.1.6 使用。
 
 ## 這個資料夾的檔案
 
 | 名稱 | 類型 | 說明 | 產生方式 | 進版控 |
 |---|---|---|---|---|
 | `README.md` | 檔案 | 本文件：說明這個資料夾的內容與規則 | 手動維護 | 是 |
-| `dialogue_generate.v1.yaml` | 檔案 | 依人物設定和 Gold Facts 生成假對話（5.1.4） | 手動維護 | 是 |
+| `dialogue_generate.v1.yaml` | 檔案 | 依人物設定和 Gold Facts 生成假對話；這輪未使用（Nano 上的小模型寫不出可用的日文，改由 Claude 撰寫） | 手動維護 | 是 |
 | `summarize.v1.yaml` | 檔案 | 把對話紀錄轉成記憶 JSON 清單（5.1.4） | 手動維護 | 是 |
 | `summarize_retry.v1.yaml` | 檔案 | 摘要驗證失敗時，接在 `summarize` 訊息後面要求修正（5.1.4） | 手動維護 | 是 |
 | `answer.v1.yaml` | 檔案 | 依檢索到的記憶回答問題並附引用（5.1.6） | 手動維護 | 是 |

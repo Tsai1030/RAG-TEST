@@ -11,3 +11,7 @@ class ConfigError(MemRAGError):
 
 class ModelNotAvailableError(MemRAGError):
     """A model is not in the registry or has not been downloaded."""
+
+
+class LLMUnavailableError(MemRAGError):
+    """The LLM server did not answer after the network retries."""
