@@ -797,6 +797,13 @@ Query + prefix → Embedding → person_id／日期過濾 → cosine 排序取 T
 - 在 Nano 用 `nano_measure.sh` 執行（暫停常駐服務、結束後一定重啟）；不載入 LLM。實際部署時 LLM 與 Embedding 同時在 Nano 上，「LLM 已載入時的 GPU Embedding」另外量一組
 - 工時：預估比原本的 5.1.7 多約 1 人天（待確認）
 
+*結果（2026-11-09，`reports/records/2026-11-09_retrieval-profile.json`）*
+
+- **瓶頸是問題 Embedding：** 現有 641 筆時，問題到 Top-k 在 GPU 約 32–38 ms、CPU 約 95–105 ms，Embedding 佔 85–99%；Qwen3-4B 已載入（閒置）時不變
+- **Top-k 維持 5：** 3 和 5 一樣快；5 的 Recall 0.941（3 是 0.851），Context 多約 150 字
+- **ChromaDB 的過濾隨總筆數變慢：** 擴充到 50k 筆時，問答用的「本人＋一週＋改看記錄日」p50 623 ms、只看本人 147 ms；精確搜尋（`NumpyStore`）分別是 0.29 ms、3.1 ms，最壞的不過濾全掃描 29 ms，索引約 115 MiB
+- **建議：** 改用精確搜尋並補上存檔與載入，待確認；本項驗收（每個組合有數字、HNSW Recall 有記錄、結論寫明）已達成
+
 **適用範圍（D2）：** 正式部署在自架伺服器，Nano 上的數字只用來比較模型之間的相對差異與找出瓶頸階段。部署伺服器確定後，用同一套 `memrag profile` 在伺服器上重跑，得到正式數字。
 
 **驗收：** 各階段耗時加總與端到端總耗時差距 < 5%；Profiler 開銷經量測並記錄；報告明確列出瓶頸階段。檢索與規模測試：實驗 A、B 的每個組合都有數字或明確的 `N/A` 原因；HNSW 對精確搜尋的 Recall@K 有記錄；結論寫明是否繼續用 ChromaDB。

@@ -11,7 +11,8 @@
     "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
     "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。",
     "向量庫：ChromaDB（HNSW）的過濾與精確搜尋完全一致、只搜本人時不跨人；搭配使用者過濾時 Recall@10 是 1.000，選型結論不受近似搜尋影響。",
-    "完整問答（ruri-v3-130m＋Qwen3-4B，測試集）：引用全部正確；無答案題 14/14 拒答；可回答題有回答 71%，其餘多半是時間題與全平假名的問題被閾值擋下；新舊衝突 4 題只答對 1 題。"
+    "完整問答（ruri-v3-130m＋Qwen3-4B，測試集）：引用全部正確；無答案題 14/14 拒答；可回答題有回答 71%，其餘多半是時間題與全平假名的問題被閾值擋下；新舊衝突 4 題只答對 1 題。",
+    "檢索速度（Nano）：問題到 Top-k 在 GPU 約 32–38 ms、CPU 約 95–105 ms，瓶頸是問題 Embedding；Top-k 3 和 5 一樣快，5 的 Recall 高 0.09。資料擴充到 50k 筆時，ChromaDB 的「本人＋日期」過濾要 0.6 秒，精確搜尋 0.3 ms。"
   ],
   "charts": [
     {
@@ -82,7 +83,8 @@
     "note": "準確度：測試集，只搜該使用者的記憶，精確搜尋；LLM 記憶庫有答案 106 題、標準事實 108 題，經池化審查補判；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "5.1.7：各階段延遲與記憶體量測；新增檢索階段（Top-k 3／5、CPU 與 GPU）與 1k／10k／50k 筆的過濾成本測試，先比 ChromaDB 與精確搜尋（計畫草案已寫入 5.1.7）。",
+    "向量庫：資料量變大時 ChromaDB 的過濾太慢（50k 筆問答用過濾 0.6 秒），建議改用精確搜尋並補上存檔，待確認。",
+    "5.1.7 其餘項目：完整流程各階段（總結、LLM 首 token 與 token／秒）的延遲與記憶體。",
     "閾值擋掉約 3 成可回答題、新舊衝突在測試集只答對 1/4：增加無答案題後重新評估閾值，並考慮寫入時標記被取代的記憶。"
   ],
   "tasks": [
@@ -92,7 +94,7 @@
     { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "完成：390 場對話、641 筆記憶（Qwen3-4B），覆蓋 98%" },
     { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "完成：ChromaDB 過濾與精確搜尋一致、不跨人，HNSW Recall@10 ≥ 0.996" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "完成：完整問答引用全部正確，無答案題 100% 拒答，約 3 成可回答題被閾值擋下（gate＋0.849）" },
-    { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
+    { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "進行中：檢索階段與向量庫規模測試完成（瓶頸是問題 Embedding；ChromaDB 過濾在 50k 筆時 0.6 秒）" },
     { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "完成（精確搜尋）：開發集、閾值校準、測試集；HNSW 與 ranx 交叉驗證未做" },
     { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "完成：ADR 0001 已採用（2026-11-08），主選 ruri-v3-130m、備選 ruri-v3-30m；5.1.6–5.1.7 的確認結果補在 ADR" }
   ]

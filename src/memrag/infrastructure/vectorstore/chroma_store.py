@@ -33,6 +33,8 @@ def to_where(flt: MemoryFilter | None) -> dict | None:
         terms.append({"person_id": {"$eq": flt.person_id}})
     if flt.category is not None:
         terms.append({"category": {"$eq": flt.category.value}})
+    if flt.categories is not None:
+        terms.append({"category": {"$in": [c.value for c in flt.categories]}})
     if flt.has_date:
         dated = [{"event_date_ord": {"$gt": 0}}, *_range_terms("event_date_ord", flt)]
         if flt.date_fallback:

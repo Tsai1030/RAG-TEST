@@ -21,6 +21,7 @@ class MemoryFilter(BaseModel):
 
     person_id: str | None = None
     category: Category | None = None
+    categories: tuple[Category, ...] | None = None  # any of these (5.1.7 multi-value filter)
     date_from: date | None = None
     date_to: date | None = None
     date_fallback: bool = False
@@ -29,6 +30,8 @@ class MemoryFilter(BaseModel):
     def _range(self) -> MemoryFilter:
         if self.date_from and self.date_to and self.date_from > self.date_to:
             raise ValueError("date_from is after date_to")
+        if self.categories is not None and not self.categories:
+            raise ValueError("categories must not be empty")
         return self
 
     @property
@@ -39,6 +42,8 @@ class MemoryFilter(BaseModel):
         if self.person_id is not None and m.person_id != self.person_id:
             return False
         if self.category is not None and m.category != self.category:
+            return False
+        if self.categories is not None and m.category not in self.categories:
             return False
         if self.has_date:
             day = m.event_date or (m.conversation_date if self.date_fallback else None)

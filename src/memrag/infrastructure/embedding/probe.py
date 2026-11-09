@@ -14,12 +14,13 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
 
 from memrag.domain.schemas.embedding import ModelSpec
+from memrag.infrastructure.memory_sampler import MemSampler as _MemSampler
+from memrag.infrastructure.memory_sampler import mib as _mib
 
 LATENCY_QUERY = "田中さんの好きな食べ物は何ですか？"
 BATCH_DOCUMENT = "田中さんは先週、駅前の喫茶店で友達と会って、来月の旅行の計画を話した。"
@@ -50,32 +51,6 @@ def run_probe(spec: ModelSpec, model_path: Path, device: str, timeout_s: int = 9
 def _failure(spec: ModelSpec, device: str, reason: str, elapsed: float, log: list[str] | None = None) -> dict:
     return {"model": spec.name, "device": device, "ok": False, "error": reason,
             "elapsed_s": round(elapsed, 1), "log_tail": log or []}
-
-
-class _MemSampler(threading.Thread):
-    def __init__(self, interval_s: float = 0.02):
-        super().__init__(daemon=True)
-        import psutil
-
-        self._psutil = psutil
-        self._interval = interval_s
-        self._done = threading.Event()  # not `_stop`: that name is a Thread method
-        self.baseline = psutil.virtual_memory().available
-        self.minimum = self.baseline
-
-    def run(self):
-        while not self._done.is_set():
-            self.minimum = min(self.minimum, self._psutil.virtual_memory().available)
-            time.sleep(self._interval)
-
-    def stop(self) -> int:
-        self._done.set()
-        self.join()
-        return self.baseline - self.minimum
-
-
-def _mib(n: float) -> float:
-    return round(n / 2**20, 1)
 
 
 def _measure(spec: ModelSpec, model_path: Path, device: str) -> dict:

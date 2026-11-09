@@ -1028,3 +1028,198 @@ def probe_models(selection: str = "all", devices: Sequence[str] = ("cuda", "cpu"
     manifest["finished"] = datetime.now().isoformat(timespec="seconds")
     write_json(run_dir / "manifest.json", manifest)
     return {"run_dir": str(run_dir), "results": results}
+
+
+PROFILE_STORES = ("chroma", "numpy")
+
+
+def _profile_setup(model: str, kind: str, stores: Sequence[str], fake: bool, note: str, settings: dict):
+    """Run folder, manifest and the embedding config the child processes use."""
+    from memrag.domain.errors import ConfigError, ModelNotAvailableError
+    from memrag.infrastructure.storage.manifest import environment_info, new_run_dir, write_json
+
+    bad = [s for s in stores if s not in PROFILE_STORES]
+    if bad:
+        raise ConfigError(f"stores must be in {PROFILE_STORES}, got {bad}")
+    root = bootstrap.project_root()
+    reg = bootstrap.registry(root)
+    spec = reg.get(model)
+    path = reg.local_path(spec)
+    if path is None and not fake:
+        raise ModelNotAvailableError(f"model {model!r} is not downloaded; run `memrag models download --models {model}`")
+    run_dir = new_run_dir(root, kind + ("_fake" if fake else ""))
+    manifest = {"run_id": run_dir.name, "kind": kind, "started": datetime.now().isoformat(timespec="seconds"),
+                "note": note, "embedding_model": {"name": spec.name, "hf_id": spec.hf_id, "revision": spec.revision,
+                                                  "dim": spec.dim, "query_prefix": spec.query_prefix},
+                "stores": list(stores), **settings, "fake": fake, "environment": environment_info(root)}
+    write_json(run_dir / "manifest.json", manifest)
+    emb = {"spec": asdict(spec), "path": str(path) if path else None, "fake": fake}
+    return run_dir, manifest, emb
+
+
+def _write_records(path: Path, records) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(r.model_dump_json() + "\n" for r in records), encoding="utf-8")
+
+
+def _profile_row(result: dict, **keys) -> dict:
+    """A child result without its raw samples and hits, for the summary table."""
+    return {**keys, **{k: v for k, v in result.items() if k not in ("samples_ms", "hits", "matched")}}
+
+
+def profile_retrieval(model: str, devices: Sequence[str] = ("cpu", "cuda"), stores: Sequence[str] = PROFILE_STORES,
+                      ks: Sequence[int] = (3, 5), repeats: int = 3, split: str | None = None, fake: bool = False,
+                      note: str = "") -> dict:
+    """Plan 5.1.7 experiment A: question → Top-k on the frozen memories, per device × store × Top-k.
+
+    One child process per device and store; every query uses the pipeline filter (person and
+    the query's dates, with the 5.1.6 settings). Recall@k against the labels, overlap with
+    exact search, and the context each Top-k would send to the LLM.
+    """
+    import shutil
+
+    from memrag.application.answer import build_context
+    from memrag.application.evaluation.retrieval_profile import label_recall, overlap_recall, summarize_latency
+    from memrag.domain.schemas.retrieval import MemoryFilter
+    from memrag.infrastructure.retrieval_probe import run_job
+    from memrag.infrastructure.storage.manifest import append_jsonl, write_json
+
+    cfg = bootstrap.pipeline_config()
+    r_cfg = cfg["retrieval"]
+    data, corpus_info = _retrieval_input("memories", split)
+    memories = load_memories()
+    by_id = {m.memory_id: m for m in memories}
+    settings = {"experiment": "A", "devices": list(devices), "ks": list(ks), "repeats": repeats,
+                "queries": len(data.queries), "memories": len(memories), **corpus_info,
+                "filter": {"date_fallback": r_cfg["date_fallback"], "category_filter": r_cfg["category_filter"]},
+                "context_budget_chars": cfg["answer"]["context_budget_chars"]}
+    run_dir, manifest, emb = _profile_setup(model, "profile_retrieval", stores, fake, note, settings)
+    work = run_dir / "work"
+    _write_records(work / "records.jsonl", memories)
+    queries = []
+    for q in data.queries:
+        f = q.filters
+        flt = MemoryFilter(person_id=q.person_id, category=f.category if r_cfg["category_filter"] else None,
+                           date_from=f.date_from, date_to=f.date_to, date_fallback=r_cfg["date_fallback"])
+        queries.append({"id": q.query_id, "text": q.text, "filters": {"pipeline": flt.model_dump(mode="json")}})
+
+    results: dict[tuple[str, str], dict] = {}
+    for device in devices:
+        for store in stores:
+            job = {"store": store, "model": model, "records": str(work / "records.jsonl"), "vectors": None,
+                   "queries": queries, "query_vectors": None, "embedding": {**emb, "device": device},
+                   "ks": list(ks), "repeats": repeats, "warmup": 5, "work_dir": str(work / f"{device}_{store}")}
+            res = run_job(job, work / f"{device}_{store}")
+            results[(device, store)] = res
+            append_jsonl(run_dir / "raw.jsonl", {"device": device, "store": store, **res})
+
+    rows = []
+    budget = cfg["answer"]["context_budget_chars"]
+    for (device, store), res in results.items():
+        row = _profile_row(res, device=device, store=store)
+        if res.get("ok"):
+            hits = res["hits"]["pipeline"]
+            exact = results.get((device, "numpy"), {})
+            row["latency"] = summarize_latency(res["samples_ms"]["pipeline"])
+            row["by_k"] = {}
+            for k in ks:
+                k_hits = hits[str(k)]
+                ctx = [build_context([(by_id[m], -rank) for rank, m in enumerate(ids)], budget) for ids in k_hits.values()]
+                row["by_k"][str(k)] = {
+                    **label_recall(k_hits, data.grades, k),
+                    "overlap_with_exact": overlap_recall(k_hits, exact["hits"]["pipeline"][str(k)])
+                    if exact.get("ok") else None,
+                    "context_chars_mean": round(sum(sum(len(line) + 1 for line in c.lines) for c in ctx) / len(ctx), 1),
+                    "context_memories_mean": round(sum(len(c.items) for c in ctx) / len(ctx), 2),
+                }
+        rows.append(row)
+    write_json(run_dir / "metrics.json", {"rows": rows})
+    shutil.rmtree(work, ignore_errors=True)
+    manifest["finished"] = datetime.now().isoformat(timespec="seconds")
+    write_json(run_dir / "manifest.json", manifest)
+    return {"run_dir": str(run_dir), "rows": rows}
+
+
+def profile_scale(model: str, sizes: Sequence[int] = (1000, 10000, 50000), stores: Sequence[str] = PROFILE_STORES,
+                  ks: Sequence[int] = (3, 5), repeats: int = 3, device: str = "cpu", fake: bool = False,
+                  note: str = "") -> dict:
+    """Plan 5.1.7 experiment B: filter cost on corpora expanded to each size, per store and scenario.
+
+    Vectors of the frozen memories and the queries are computed once in a child process;
+    each size × store is measured in its own child process without the embedding model.
+    """
+    import gc
+    import shutil
+
+    import numpy as np
+
+    from memrag.application.evaluation.retrieval_profile import (
+        SCALE_SCENARIOS,
+        USERS,
+        expand_corpus,
+        overlap_recall,
+        scale_queries,
+        selectivity,
+        summarize_latency,
+        user_spans,
+    )
+    from memrag.domain.errors import PipelineError
+    from memrag.infrastructure.retrieval_probe import run_job
+    from memrag.infrastructure.storage.manifest import append_jsonl, write_json
+
+    data, corpus_info = _retrieval_input("memories", None)
+    memories = load_memories()
+    settings = {"experiment": "B", "sizes": list(sizes), "users": USERS, "ks": list(ks), "repeats": repeats,
+                "scenarios": list(SCALE_SCENARIOS), "queries": len(data.queries), "base_memories": len(memories),
+                "vector_device": device, "noise_cosine": 0.98, **corpus_info}
+    run_dir, manifest, emb = _profile_setup(model, "profile_scale", stores, fake, note, settings)
+    work = run_dir / "work"
+    work.mkdir(parents=True)
+    embed = run_job({"mode": "embed", "embedding": {**emb, "device": device},
+                     "documents": [m.content for m in memories], "queries": [q.text for q in data.queries],
+                     "out_documents": str(work / "base_docs.npy"), "out_queries": str(work / "queries.npy")},
+                    work / "embed")
+    if not embed.get("ok"):
+        raise PipelineError("embed", model, str(embed))
+    base = np.load(work / "base_docs.npy")
+    qids = [q.query_id for q in data.queries]
+
+    rows = []
+    for size in sizes:
+        records, vectors = expand_corpus(memories, base, size)
+        size_dir = work / str(size)
+        _write_records(size_dir / "records.jsonl", records)
+        np.save(size_dir / "vectors.npy", vectors)
+        flts = scale_queries(qids, user_spans(records))
+        queries = [{"id": qid, "text": None, "filters": {s: f[s].model_dump(mode="json") for s in SCALE_SCENARIOS}}
+                   for qid, f in zip(qids, flts)]
+        total = len(records)
+        del records, vectors
+        gc.collect()
+        results = {}
+        for store in stores:
+            job = {"store": store, "model": model, "records": str(size_dir / "records.jsonl"),
+                   "vectors": str(size_dir / "vectors.npy"), "queries": queries,
+                   "query_vectors": str(work / "queries.npy"), "embedding": None, "ks": list(ks),
+                   "repeats": repeats, "warmup": 5, "work_dir": str(size_dir / store)}
+            results[store] = run_job(job, size_dir / store)
+            append_jsonl(run_dir / "raw.jsonl", {"size": size, "store": store, **results[store]})
+        exact = results.get("numpy", {})
+        for store, res in results.items():
+            row = _profile_row(res, size=size, store=store)
+            if res.get("ok"):
+                row["scenarios"] = {}
+                for s in SCALE_SCENARIOS:
+                    cell = {"latency": summarize_latency(res["samples_ms"][s])}
+                    if exact.get("ok"):
+                        cell["selectivity"] = selectivity(exact["matched"][s], total)
+                        cell["overlap_with_exact"] = {str(k): overlap_recall(res["hits"][s][str(k)],
+                                                                             exact["hits"][s][str(k)]) for k in ks}
+                    row["scenarios"][s] = cell
+            rows.append(row)
+        shutil.rmtree(size_dir, ignore_errors=True)
+    write_json(run_dir / "metrics.json", {"rows": rows})
+    shutil.rmtree(work, ignore_errors=True)
+    manifest["finished"] = datetime.now().isoformat(timespec="seconds")
+    write_json(run_dir / "manifest.json", manifest)
+    return {"run_dir": str(run_dir), "rows": rows}

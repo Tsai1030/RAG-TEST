@@ -30,6 +30,14 @@ def test_filter_reference_semantics():
         MemoryFilter(date_from=date(2026, 11, 2), date_to=date(2026, 11, 1))
 
 
+def test_categories_filter_accepts_any_of_them():
+    flt = MemoryFilter(categories=("preference", "plan"))
+    assert [flt.matches(r) for r in RECS] == [False, True, False]
+    assert to_where(flt) == {"category": {"$in": ["preference", "plan"]}}
+    with pytest.raises(ValidationError):
+        MemoryFilter(categories=())
+
+
 def test_date_fallback_matches_undated_memories_by_conversation_date():
     # RECS were told on 2026-10-05; only the undated one falls back to that day
     flt = MemoryFilter(date_from=date(2026, 10, 4), date_to=date(2026, 10, 6), date_fallback=True)

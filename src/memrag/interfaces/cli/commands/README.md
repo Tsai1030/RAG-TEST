@@ -13,6 +13,7 @@
 | `embed.py` | 檔案 | `memrag embed`：把一句文字轉成向量；`--explain` 顯示實際送進模型的文字 | 手動維護 | 是 |
 | `dataset.py` | 檔案 | `memrag dataset validate`、`show-query`、`split`、`sample`、`agreement`：檢查與查看標準答案 | 手動維護 | 是 |
 | `corpus.py` | 檔案 | `memrag dialogues validate`、`memrag summarize`、`memrag corpus build`：檢查對話、總結一場對話（`--show-retries` 看每次嘗試）、總結全部對話並凍結語料 | 手動維護 | 是 |
+| `profile.py` | 檔案 | `memrag profile retrieval`（實驗 A：問題到 Top-k 的各段耗時、記憶體、Recall，裝置 × 向量庫 × Top-k）、`profile scale`（實驗 B：記憶庫擴充到各種筆數時各過濾條件的成本） | 手動維護 | 是 |
 | `store.py` | 檔案 | `memrag store build`（把記憶庫寫進 `results/vector_db/`）、`store check`（ChromaDB 對精確搜尋）、`memrag search`（依使用者、類別、日期過濾搜尋記憶） | 手動維護 | 是 |
 | `ask.py` | 檔案 | `memrag ask`（完整問答，`--trace` 列出檢索結果、閾值、Context、耗時與設定；`--threshold-mode per_memory|gate` 選閾值做法）、`memrag ingest`（總結對話並寫入向量庫，產生結果資料夾） | 手動維護 | 是 |
 | `ui.py` | 檔案 | `memrag ui`：啟動手動測試 UI（`--fake` 不需要模型）；沒安裝 Gradio 時提示 `uv sync --extra ui` | 手動維護 | 是 |
