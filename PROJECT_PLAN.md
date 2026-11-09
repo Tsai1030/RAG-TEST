@@ -59,7 +59,7 @@
 
 ### 2.2 需要確認的決策
 
-未回覆時依「預設」進行，所有預設都可透過設定檔切換。**已確認：** 向量庫先用 ChromaDB（見 5.1.5）；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 `~/50019/rag_test`；Windows 專案資料全部同步到 Nano（見 2.3）；正式部署在自架伺服器，不用外部 API（D2）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 `bge-base-zh-v1.5` 加入當對照組（見 5.1.1）。
+未回覆時依「預設」進行，所有預設都可透過設定檔切換。**已確認：** 向量庫先用 ChromaDB（見 5.1.5），2026-11-09 依 5.1.7 的規模測試改用精確搜尋（`NumpyStore`），ChromaDB 保留為可選設定；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 `~/50019/rag_test`；Windows 專案資料全部同步到 Nano（見 2.3）；正式部署在自架伺服器，不用外部 API（D2）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 `bge-base-zh-v1.5` 加入當對照組（見 5.1.1）。
 
 | # | 問題 | 預設 | 影響 |
 |---|---|---|---|
@@ -222,7 +222,8 @@ RAG TEST/
 │   │       ├── dataset_check.py  # 標準答案檢查、切分、抽樣、標註一致度
 │   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：兩種記憶庫、三種過濾範圍、逐題指標、配對比較
 │   │       ├── corpus_check.py   # 對話檢查、記憶語料的驗收數字
-│   │       ├── store_check.py    # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
+│   │       ├── store_check.py    # 向量庫（存檔後重開）對精確搜尋：過濾一致、不跨人、Recall
+│   │       ├── retrieval_profile.py # 5.1.7 檢索與規模測試：擴充資料、過濾情境、統計
 │   │       ├── answer_eval.py    # 完整流程的回答檢查：該答／該拒、引用、新舊記憶
 │   │       ├── qrels.py          # 編譯 Qrels（目前在 retrieval_eval.py 內：記憶繼承事實分數＋池化判斷）
 │   │       ├── metric_runner.py  # 模型 × 設定 測試矩陣
@@ -243,7 +244,8 @@ RAG TEST/
 │   │   │   ├── cache.py          # 通過驗證的輸出快取，重跑免呼叫 LLM
 │   │   │   └── fake.py           # 測試用：固定回應，或把使用者發言當記憶
 │   │   ├── vectorstore/
-│   │   │   ├── chroma_store.py   # ChromaDB 內嵌模式實作
+│   │   │   ├── numpy_store.py    # 精確搜尋（產品用，5.1.7 起）：連續矩陣＋向量化過濾，存檔在 results/vector_db
+│   │   │   ├── chroma_store.py   # ChromaDB 內嵌模式實作（可選）
 │   │   │   └── exact_store.py    # 精確搜尋，指標測試基準
 │   │   ├── profiling/
 │   │   │   ├── psutil_profiler.py # 系統記憶體與 RSS 取樣
@@ -389,8 +391,10 @@ uv run memrag eval rescore results/runs/<run_id> # 標註更新後，沿用存�
 uv run memrag eval calibrate results/runs/<dev run> --write # 校準閾值，寫入 configs/thresholds.yaml
 uv run memrag eval thresholds results/runs/<test run> # 用固定閾值評估小候選集
 uv run memrag select --retrieval <test run> --thresholds <threshold run> --probe <probe run> # 依 selection.yaml 選型
-uv run memrag store build --model ruri-v3-130m  # 把記憶庫寫進 results/vector_db（ChromaDB）
-uv run memrag store check results/runs/<memories run> # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
+uv run memrag store build --model ruri-v3-130m  # 把記憶庫寫進 results/vector_db（pipeline.yaml 的 retrieval.store）
+uv run memrag store check results/runs/<memories run> --store numpy # 存檔重開後對精確搜尋：過濾一致、不跨人、Recall
+uv run memrag profile retrieval --devices cpu,cuda   # 5.1.7 實驗 A：問題到 Top-k 的耗時、記憶體、Recall
+uv run memrag profile scale --sizes 1000,10000,50000 # 5.1.7 實驗 B：資料量與過濾成本
 uv run memrag search "好きな食べ物" --model ruri-v3-130m --person p01 --category preference -k 5
 uv run memrag ingest d_p01_1027 --model ruri-v3-130m # 對話 → 總結 → 向量 → 寫入向量庫（Nano，LLM session）
 uv run memrag ask "ラーメン、今もよく食べてる？" --person p06 --today 2026-11-01 --trace # 完整問答（Nano，LLM session）
@@ -667,7 +671,7 @@ flowchart LR
 
 ### 5.1.5 Vector DB Setup & Filtered Retrieval
 
-**選型（已確認）：** 先用 ChromaDB 內嵌模式，理由是免另外架服務、會在行程內建 HNSW 索引（能量測索引時間），且支援 `$gte` / `$lte` / `$in` / `$and`。另提供 `ExactStore` 作為精確基準。其他資料庫日後只需實作 `VectorStore`。
+**選型（已確認）：** 先用 ChromaDB 內嵌模式，理由是免另外架服務、會在行程內建 HNSW 索引（能量測索引時間），且支援 `$gte` / `$lte` / `$in` / `$and`。另提供 `ExactStore` 作為精確基準。其他資料庫日後只需實作 `VectorStore`。**2026-11-09 更新：** 5.1.7 的規模測試發現 ChromaDB 的過濾成本隨總筆數成長（50k 筆時問答用的過濾 623 ms），產品改用精確搜尋 `NumpyStore`（`pipeline.yaml` 的 `retrieval.store: numpy`），ChromaDB 保留為可選設定；`store check --store numpy` 重跑：6 個模型存檔重開後過濾不一致 0、跨人 0、Recall@10 1.000（run_id `20261109-142603_store_check`）。
 
 **工作項目**
 
@@ -802,7 +806,7 @@ Query + prefix → Embedding → person_id／日期過濾 → cosine 排序取 T
 - **瓶頸是問題 Embedding：** 現有 641 筆時，問題到 Top-k 在 GPU 約 32–38 ms、CPU 約 95–105 ms，Embedding 佔 85–99%；Qwen3-4B 已載入（閒置）時不變
 - **Top-k 維持 5：** 3 和 5 一樣快；5 的 Recall 0.941（3 是 0.851），Context 多約 150 字
 - **ChromaDB 的過濾隨總筆數變慢：** 擴充到 50k 筆時，問答用的「本人＋一週＋改看記錄日」p50 623 ms、只看本人 147 ms；精確搜尋（`NumpyStore`）分別是 0.29 ms、3.1 ms，最壞的不過濾全掃描 29 ms，索引約 115 MiB
-- **建議：** 改用精確搜尋並補上存檔與載入，待確認；本項驗收（每個組合有數字、HNSW Recall 有記錄、結論寫明）已達成
+- **決定（2026-11-09）：** 改用精確搜尋，`NumpyStore` 補上存檔與載入（新記憶附加寫入、開啟時修復寫到一半的列）；5.1.5 的一致性檢查重跑通過（`20261109-142603_store_check`）。本項驗收（每個組合有數字、HNSW Recall 有記錄、結論寫明）已達成
 
 **適用範圍（D2）：** 正式部署在自架伺服器，Nano 上的數字只用來比較模型之間的相對差異與找出瓶頸階段。部署伺服器確定後，用同一套 `memrag profile` 在伺服器上重跑，得到正式數字。
 

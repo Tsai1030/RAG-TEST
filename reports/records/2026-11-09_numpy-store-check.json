@@ -1,0 +1,57 @@
+{
+  "title": "向量庫改用精確搜尋：存檔重開後的一致性檢查",
+  "date": "2026-11-09",
+  "task": "5.1.5",
+  "type": "指標評估",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "產品向量庫從 ChromaDB 改成精確搜尋（NumpyStore）後，存檔、關閉、重新開啟的結果，是否和精確基準完全一致？",
+  "environment": [
+    "Nano，CPU；沿用測試集記憶庫評估存下的向量（20261108-005438_retrieval_eval_memories），641 筆記憶、120 題、6 個模型",
+    "NumpyStore 存檔格式：每個模型一個資料夾（meta.json、vectors.f32、records.jsonl）",
+    "run_id 20261109-142603_store_check"
+  ],
+  "method": [
+    "uv run memrag store check results/runs/20261108-005438_retrieval_eval_memories --store numpy",
+    "寫入、重複寫入 50 筆（冪等），關閉後從磁碟重新開啟，再和精確基準比較：每題的過濾加 300 組隨機過濾接受的記憶、只搜本人時的跨人次數、Recall@10"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "caption": "NumpyStore（存檔重開後）對精確基準",
+      "columns": ["模型", "建索引", "磁碟", "重開筆數", "過濾不一致", "跨人", "Recall@10 不過濾", "Recall@10 只搜本人", "Recall@10 本人＋過濾"],
+      "numeric": [1, 2, 3, 4, 5, 6, 7, 8],
+      "rows": [
+        ["ruri-v3-30m", "0.04 s", "0.84 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["ruri-v3-130m", "0.04 s", "1.47 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["ruri-v3-310m", "0.05 s", "2.10 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["qwen3-emb-0.6b", "0.07 s", "2.72 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["e5-small", "0.04 s", "1.16 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["bge-base-zh-v1.5（對照組）", "0.05 s", "2.10 MiB", "641", "0", "0", "1.000", "1.000", "1.000"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "存檔重開後筆數不變、重複寫入不增加；過濾與精確基準完全一致，不跨人；精確搜尋所以 Recall@10 都是 1.000（ChromaDB 不過濾時是 0.996–1.000）。",
+        "建索引 0.04–0.07 秒、磁碟 0.8–2.7 MiB，都比 ChromaDB（0.58–0.74 秒、2.0–4.3 MiB）小。",
+        "產品向量庫已用新格式重建（ruri-v3-130m，641 筆，寫入 0.05 秒）；ラーメン那題的搜尋排序和之前相同。重新計算向量時分數會有小數第三位的差異（例如 0.862 → 0.860），不影響排序，但接近閾值 0.849 的記憶可能有微小變動。",
+        "單元測試另外涵蓋：重跑不寫檔、內容改變時整份重寫、寫到一半中斷時開啟會修復、拒絕別的模型或維度。"
+      ]
+    }
+  ],
+  "conclusion": [
+    "精確搜尋通過 5.1.5 的全部檢查，產品改用它（pipeline.yaml 的 retrieval.store: numpy），ChromaDB 保留為可選設定。"
+  ],
+  "next": [
+    "5.1.7 其餘項目：完整流程各階段的延遲與記憶體。"
+  ],
+  "sources": [
+    { "text": "results/runs/20261109-142603_store_check/" },
+    { "text": "src/memrag/infrastructure/vectorstore/numpy_store.py、tests/unit/infrastructure/test_numpy_store.py" }
+  ],
+  "related": [
+    { "id": "2026-11-09_retrieval-profile", "relation": "改用精確搜尋的理由（規模測試）" },
+    { "id": "2026-11-08_vector-store-check", "relation": "同一套檢查，當時是 ChromaDB" }
+  ]
+}

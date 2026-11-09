@@ -60,7 +60,8 @@ class MemRAG:
     def store(self):
         if self._store is None:
             spec = self.embedding_model
-            self._store = bootstrap.vector_store(spec.name, spec.dim, fake=self._fake, path=self._store_dir)
+            self._store = bootstrap.vector_store(spec.name, spec.dim, fake=self._fake, path=self._store_dir,
+                                                 kind=self._cfg["retrieval"].get("store", "numpy"))
         return self._store
 
     @property
@@ -915,11 +916,13 @@ def evaluate_answers(model: str, split: str | None = None, limit: int | None = N
     return {"run_dir": str(run_dir), **metrics}
 
 
-def check_vector_store(run_dir: str, note: str = "") -> dict:
-    """Plan 5.1.5: ChromaDB (HNSW) against the exact store, reusing the vectors of a memory-corpus run.
+def check_vector_store(run_dir: str, note: str = "", store: str | None = None) -> dict:
+    """Plan 5.1.5: a persistent store against the exact reference, reusing the vectors of a memory-corpus run.
 
-    Per model: index build time and disk size, filter translation on query and random
-    filters, cross-user hits, and HNSW recall@10. Writes results/runs/<run_id>_store_check/.
+    `store` is numpy or chroma (default: pipeline.yaml's retrieval.store). Per model: index
+    build time and disk size, idempotent upsert, then the store is closed and reopened from
+    disk and checked: filter translation on query and random filters, cross-user hits, and
+    recall@10 against exact search. Writes results/runs/<run_id>_store_check/.
     """
     import shutil
     import tempfile
@@ -928,9 +931,9 @@ def check_vector_store(run_dir: str, note: str = "") -> dict:
     from memrag.application.evaluation.store_check import compare
     from memrag.domain.errors import ConfigError
     from memrag.infrastructure.storage.manifest import new_run_dir, write_json
-    from memrag.infrastructure.vectorstore.chroma_store import ChromaStore
     from memrag.infrastructure.vectorstore.exact_store import ExactStore
 
+    store = store or bootstrap.pipeline_config()["retrieval"].get("store", "numpy")
     source, old, data, corpus_info, vectors = _load_run(run_dir)
     if corpus_info["corpus_name"] != "memories":
         raise ConfigError("check the store on a --corpus memories run")
@@ -942,27 +945,31 @@ def check_vector_store(run_dir: str, note: str = "") -> dict:
         dim = doc_vecs.shape[1]
         exact = ExactStore(dim)
         exact.upsert(memories, doc_vecs)
-        folder = Path(tempfile.mkdtemp(prefix="memrag_chroma_"))
+        folder = Path(tempfile.mkdtemp(prefix=f"memrag_{store}_"))
         try:
-            chroma = ChromaStore(model, dim, folder)
+            built = bootstrap.vector_store(model, dim, path=folder, kind=store)
             start = time.perf_counter()
-            chroma.upsert(memories, doc_vecs)
+            built.upsert(memories, doc_vecs)
             build_s = time.perf_counter() - start
-            chroma.upsert(memories[:50], doc_vecs[:50])  # idempotent: must not add rows
-            idempotent = chroma.count() == len(memories)
-            row = compare(memories, data.queries, query_vecs, exact, chroma)
+            built.upsert(memories[:50], doc_vecs[:50])  # idempotent: must not add rows
+            idempotent = built.count() == len(memories)
+            built.close()
+            reopened = bootstrap.vector_store(model, dim, path=folder, kind=store)
+            reopened_count = reopened.count()
+            row = compare(memories, data.queries, query_vecs, exact, reopened)
             disk = sum(p.stat().st_size for p in folder.rglob("*") if p.is_file())
-            chroma.close()
+            reopened.close()
         finally:
             shutil.rmtree(folder, ignore_errors=True)
         results[model] = {"dim": dim, "memories": len(memories), "build_s": round(build_s, 3),
-                          "disk_mib": round(disk / 2**20, 2), "idempotent_upsert": idempotent, **row}
+                          "disk_mib": round(disk / 2**20, 2), "idempotent_upsert": idempotent,
+                          "reopened_count": reopened_count, **row}
     out = new_run_dir(bootstrap.project_root(), "store_check")
-    write_json(out / "metrics.json", {"models": results})
+    write_json(out / "metrics.json", {"store": store, "models": results})
     write_json(out / "manifest.json", {
-        "run_id": out.name, "kind": "store_check", "source_run": source.name, "note": note,
+        "run_id": out.name, "kind": "store_check", "store": store, "source_run": source.name, "note": note,
         "created": datetime.now().isoformat(timespec="seconds"), **corpus_info, "queries": len(data.queries)})
-    return {"run_dir": str(out), "models": results}
+    return {"run_dir": str(out), "store": store, "models": results}
 
 
 def rescore_retrieval(run_dir: str, note: str = "") -> dict:

@@ -14,8 +14,9 @@ def register(sub) -> None:
     b.add_argument("--json", action="store_true")
     b.set_defaults(handler=run_build)
 
-    c = p.add_parser("check", help="用某次記憶庫評估存下的向量，比較 ChromaDB 與精確搜尋：過濾一致、不跨人、HNSW Recall")
+    c = p.add_parser("check", help="用某次記憶庫評估存下的向量，比較向量庫（存檔後重新開啟）與精確搜尋：過濾一致、不跨人、Recall")
     c.add_argument("run_dir")
+    c.add_argument("--store", choices=["numpy", "chroma"], help="預設用 pipeline.yaml 的 retrieval.store")
     c.add_argument("--note", default="")
     c.add_argument("--json", action="store_true")
     c.set_defaults(handler=run_check)
@@ -48,15 +49,16 @@ def run_build(args) -> int:
 def run_check(args) -> int:
     from memrag.interfaces.cli.main import print_json
 
-    out = memrag.check_vector_store(args.run_dir, note=args.note)
+    out = memrag.check_vector_store(args.run_dir, note=args.note, store=args.store)
     if args.json:
         print_json(out)
         return 0
-    print(f"結果資料夾：{out['run_dir']}")
-    print(f"  {'模型':<20}{'建索引秒':>9}{'磁碟MiB':>9}{'冪等':>5}{'過濾不一致':>10}{'跨人':>5}{'R@10 全部':>10}{'R@10 本人':>10}{'R@10 過濾':>10}")
+    print(f"結果資料夾：{out['run_dir']}（向量庫：{out['store']}）")
+    print(f"  {'模型':<20}{'建索引秒':>9}{'磁碟MiB':>9}{'冪等':>5}{'重開筆數':>9}{'過濾不一致':>10}{'跨人':>5}{'R@10 全部':>10}{'R@10 本人':>10}{'R@10 過濾':>10}")
     for model, r in out["models"].items():
         s = r["scopes"]
         print(f"  {model:<20}{r['build_s']:>9.2f}{r['disk_mib']:>9.2f}{'是' if r['idempotent_upsert'] else '否':>5}"
+              f"{r['reopened_count']:>9}"
               f"{len(r['filter_mismatches']):>10}{s['person']['cross_user_hits'] + s['person+filter']['cross_user_hits']:>5}"
               f"{s['all']['recall@10']:>10.3f}{s['person']['recall@10']:>10.3f}{s['person+filter']['recall@10']:>10.3f}")
     return 0

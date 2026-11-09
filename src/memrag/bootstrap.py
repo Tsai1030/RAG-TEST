@@ -83,18 +83,33 @@ def response_cache(cfg: dict, root: Path | None = None):
     return FileResponseCache((root or project_root()) / cfg["summarize"]["cache_dir"])
 
 
-def vector_store(model: str, dim: int, root: Path | None = None, fake: bool = False, path: Path | None = None):
-    """The persistent ChromaDB store of one model under results/vector_db/ (or `path`).
+VECTOR_STORES = ("numpy", "chroma")
 
-    Fake vectors go to an in-process store, so they can never overwrite a real index.
+
+def vector_store(model: str, dim: int, root: Path | None = None, fake: bool = False, path: Path | None = None,
+                 kind: str = "numpy"):
+    """The persistent store of one model under results/vector_db/ (or `path`).
+
+    `kind` is pipeline.yaml's retrieval.store: numpy (exact search, chosen in 5.1.7) or
+    chroma (HNSW). Fake vectors go to an in-process store, so they can never overwrite a
+    real index.
     """
-    from memrag.infrastructure.vectorstore.chroma_store import ChromaStore
+    from memrag.domain.errors import ConfigError
 
+    if kind not in VECTOR_STORES:
+        raise ConfigError(f"retrieval.store must be one of {VECTOR_STORES}, got {kind!r}")
+    if kind == "chroma":
+        from memrag.infrastructure.vectorstore.chroma_store import ChromaStore as Store
+    else:
+        from memrag.infrastructure.vectorstore.numpy_store import NumpyStore
+
+        def Store(model, dim, path=None):  # same call shape as ChromaStore
+            return NumpyStore(dim, path, model)
     if fake and path is None:
-        return ChromaStore(model, dim)
+        return Store(model, dim)
     path = path or (root or project_root()) / VECTOR_DB
     path.mkdir(parents=True, exist_ok=True)
-    return ChromaStore(model, dim, path)
+    return Store(model, dim, path)
 
 
 def thresholds(root: Path | None = None) -> dict:

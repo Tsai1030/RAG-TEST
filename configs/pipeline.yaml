@@ -18,6 +18,11 @@ summarize:
   cache_dir: results/llm_cache
 
 retrieval:
+  # numpy: exact search (NumpyStore), chosen 2026-11-09 (5.1.7): ChromaDB's person + date filter
+  # grows with the total count (623 ms at 50k memories) while exact search stays under 1 ms.
+  # chroma: HNSW (ChromaDB), kept as an option. Both persist under results/vector_db/.
+  store: numpy
+  # 5 rather than 3: same speed, recall 0.941 vs 0.851 (5.1.7)
   top_k: 5
   # Decided 2026-11-08 on the dev set (5.1.6): the summarizer's categories are 75% correct and
   # 78% of memories have no event date, so the pipeline filters by date with the

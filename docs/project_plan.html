@@ -452,7 +452,7 @@ td.nowrap { white-space: nowrap; }
       </table></div>
       <p><strong>開發機：</strong>Windows 筆電（i3-10110U、約 16 GB RAM、無 NVIDIA GPU），路徑 <code>D:\RAG TEST</code>，只用於寫程式和跑快速測試，效能數據不採計。</p>
       <h3>2.2 需要確認的決策</h3>
-      <p>未回覆時依「預設」進行，所有預設都可透過設定檔切換。<strong>已確認：</strong>向量庫先用 ChromaDB（見 5.1.5）；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 <code>~/50019/rag_test</code>；Windows 專案資料全部同步到 Nano（見 2.3）；正式部署在自架伺服器，不用外部 API（D2）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 <code>bge-base-zh-v1.5</code> 加入當對照組（見 5.1.1）。</p>
+      <p>未回覆時依「預設」進行，所有預設都可透過設定檔切換。<strong>已確認：</strong>向量庫先用 ChromaDB（見 5.1.5），2026-11-09 依 5.1.7 的規模測試改用精確搜尋（<code>NumpyStore</code>），ChromaDB 保留為可選設定；所有 GPU 工作在 Jetson Orin Nano 執行；專案放在 <code>~/50019/rag_test</code>；Windows 專案資料全部同步到 Nano（見 2.3）；正式部署在自架伺服器，不用外部 API（D2）；系統會商用（D3）；只做日文（D6）；日文審閱由 Claude 負責（D7）；D8、D9 的處理方向；產品現用的 <code>bge-base-zh-v1.5</code> 加入當對照組（見 5.1.1）。</p>
       <div class="table-wrap xwide"><table>
         <thead><tr><th>#</th><th>問題</th><th>預設</th><th>影響</th></tr></thead>
         <tbody>
@@ -614,7 +614,8 @@ td.nowrap { white-space: nowrap; }
 │   │       ├── dataset_check.py  # 標準答案檢查、切分、抽樣、標註一致度
 │   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：兩種記憶庫、三種過濾範圍、逐題指標、配對比較
 │   │       ├── corpus_check.py   # 對話檢查、記憶語料的驗收數字
-│   │       ├── store_check.py    # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
+│   │       ├── store_check.py    # 向量庫（存檔後重開）對精確搜尋：過濾一致、不跨人、Recall
+│   │       ├── retrieval_profile.py # 5.1.7 檢索與規模測試：擴充資料、過濾情境、統計
 │   │       ├── answer_eval.py    # 完整流程的回答檢查：該答／該拒、引用、新舊記憶
 │   │       ├── qrels.py          # 編譯 Qrels（目前在 retrieval_eval.py 內：記憶繼承事實分數＋池化判斷）
 │   │       ├── metric_runner.py  # 模型 × 設定 測試矩陣
@@ -635,7 +636,8 @@ td.nowrap { white-space: nowrap; }
 │   │   │   ├── cache.py          # 通過驗證的輸出快取，重跑免呼叫 LLM
 │   │   │   └── fake.py           # 測試用：固定回應，或把使用者發言當記憶
 │   │   ├── vectorstore/
-│   │   │   ├── chroma_store.py   # ChromaDB 內嵌模式實作
+│   │   │   ├── numpy_store.py    # 精確搜尋（產品用，5.1.7 起）：連續矩陣＋向量化過濾，存檔在 results/vector_db
+│   │   │   ├── chroma_store.py   # ChromaDB 內嵌模式實作（可選）
 │   │   │   └── exact_store.py    # 精確搜尋，指標測試基準
 │   │   ├── profiling/
 │   │   │   ├── psutil_profiler.py # 系統記憶體與 RSS 取樣
@@ -770,8 +772,10 @@ uv run memrag eval rescore results/runs/&lt;run_id&gt; # 標註更新後，沿�
 uv run memrag eval calibrate results/runs/&lt;dev run&gt; --write # 校準閾值，寫入 configs/thresholds.yaml
 uv run memrag eval thresholds results/runs/&lt;test run&gt; # 用固定閾值評估小候選集
 uv run memrag select --retrieval &lt;test run&gt; --thresholds &lt;threshold run&gt; --probe &lt;probe run&gt; # 依 selection.yaml 選型
-uv run memrag store build --model ruri-v3-130m  # 把記憶庫寫進 results/vector_db（ChromaDB）
-uv run memrag store check results/runs/&lt;memories run&gt; # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
+uv run memrag store build --model ruri-v3-130m  # 把記憶庫寫進 results/vector_db（pipeline.yaml 的 retrieval.store）
+uv run memrag store check results/runs/&lt;memories run&gt; --store numpy # 存檔重開後對精確搜尋：過濾一致、不跨人、Recall
+uv run memrag profile retrieval --devices cpu,cuda   # 5.1.7 實驗 A：問題到 Top-k 的耗時、記憶體、Recall
+uv run memrag profile scale --sizes 1000,10000,50000 # 5.1.7 實驗 B：資料量與過濾成本
 uv run memrag search "好きな食べ物" --model ruri-v3-130m --person p01 --category preference -k 5
 uv run memrag ingest d_p01_1027 --model ruri-v3-130m # 對話 → 總結 → 向量 → 寫入向量庫（Nano，LLM session）
 uv run memrag ask "ラーメン、今もよく食べてる？" --person p06 --today 2026-11-01 --trace # 完整問答（Nano，LLM session）
@@ -1053,7 +1057,7 @@ ruri-v3-130m:
           <span class="task-id">5.1.5 · 2.0 人天</span>
           <h3>Vector DB Setup &amp; Filtered Retrieval</h3>
         </div>
-        <p><strong>選型（已確認）：</strong>先用 ChromaDB 內嵌模式，理由是免另外架服務、會在行程內建 HNSW 索引（能量測索引時間），且支援 <code>$gte</code> / <code>$lte</code> / <code>$in</code> / <code>$and</code>。另提供 <code>ExactStore</code> 作為精確基準。其他資料庫日後只需實作 <code>VectorStore</code>。</p>
+        <p><strong>選型（已確認）：</strong>先用 ChromaDB 內嵌模式，理由是免另外架服務、會在行程內建 HNSW 索引（能量測索引時間），且支援 <code>$gte</code> / <code>$lte</code> / <code>$in</code> / <code>$and</code>。另提供 <code>ExactStore</code> 作為精確基準。其他資料庫日後只需實作 <code>VectorStore</code>。<strong>2026-11-09 更新：</strong>5.1.7 的規模測試發現 ChromaDB 的過濾成本隨總筆數成長（50k 筆時問答用的過濾 623 ms），產品改用精確搜尋 <code>NumpyStore</code>（<code>pipeline.yaml</code> 的 <code>retrieval.store: numpy</code>），ChromaDB 保留為可選設定；<code>store check --store numpy</code> 重跑：6 個模型存檔重開後過濾不一致 0、跨人 0、Recall@10 1.000（run_id <code>20261109-142603_store_check</code>）。</p>
         <h4>工作項目</h4>
         <ul>
           <li>每個模型＋維度使用獨立 collection：<code>mem__{model}__{dim}</code>，距離固定 cosine</li>
@@ -1188,7 +1192,7 @@ ruri-v3-130m:
           <li><strong>瓶頸是問題 Embedding：</strong>現有 641 筆時，問題到 Top-k 在 GPU 約 32–38 ms、CPU 約 95–105 ms，Embedding 佔 85–99%；Qwen3-4B 已載入（閒置）時不變</li>
           <li><strong>Top-k 維持 5：</strong>3 和 5 一樣快；5 的 Recall 0.941（3 是 0.851），Context 多約 150 字</li>
           <li><strong>ChromaDB 的過濾隨總筆數變慢：</strong>擴充到 50k 筆時，問答用的「本人＋一週＋改看記錄日」p50 623 ms、只看本人 147 ms；精確搜尋（<code>NumpyStore</code>）分別是 0.29 ms、3.1 ms，最壞的不過濾全掃描 29 ms，索引約 115 MiB</li>
-          <li><strong>建議：</strong>改用精確搜尋並補上存檔與載入，待確認；本項驗收（每個組合有數字、HNSW Recall 有記錄、結論寫明）已達成</li>
+          <li><strong>決定（2026-11-09）：</strong>改用精確搜尋，<code>NumpyStore</code> 補上存檔與載入（新記憶附加寫入、開啟時修復寫到一半的列）；5.1.5 的一致性檢查重跑通過（<code>20261109-142603_store_check</code>）。本項驗收（每個組合有數字、HNSW Recall 有記錄、結論寫明）已達成</li>
         </ul>
         <p><strong>適用範圍（D2）：</strong>正式部署在自架伺服器，Nano 上的數字只用來比較模型之間的相對差異與找出瓶頸階段。部署伺服器確定後，用同一套 <code>memrag profile</code> 在伺服器上重跑，得到正式數字。</p>
         <dl class="outcome">
@@ -1497,7 +1501,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。",
     "向量庫：ChromaDB（HNSW）的過濾與精確搜尋完全一致、只搜本人時不跨人；搭配使用者過濾時 Recall@10 是 1.000，選型結論不受近似搜尋影響。",
     "完整問答（ruri-v3-130m＋Qwen3-4B，測試集）：引用全部正確；無答案題 14/14 拒答；可回答題有回答 71%，其餘多半是時間題與全平假名的問題被閾值擋下；新舊衝突 4 題只答對 1 題。",
-    "檢索速度（Nano）：問題到 Top-k 在 GPU 約 32–38 ms、CPU 約 95–105 ms，瓶頸是問題 Embedding；Top-k 3 和 5 一樣快，5 的 Recall 高 0.09。資料擴充到 50k 筆時，ChromaDB 的「本人＋日期」過濾要 0.6 秒，精確搜尋 0.3 ms。"
+    "檢索速度（Nano）：問題到 Top-k 在 GPU 約 32–38 ms、CPU 約 95–105 ms，瓶頸是問題 Embedding；Top-k 3 和 5 一樣快，5 的 Recall 高 0.09。資料擴充到 50k 筆時，ChromaDB 的「本人＋日期」過濾要 0.6 秒，精確搜尋 0.3 ms，所以產品向量庫改用精確搜尋（存檔重開後與精確基準完全一致）。"
   ],
   "charts": [
     {
@@ -1568,7 +1572,6 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     "note": "準確度：測試集，只搜該使用者的記憶，精確搜尋；LLM 記憶庫有答案 106 題、標準事實 108 題，經池化審查補判；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "向量庫：資料量變大時 ChromaDB 的過濾太慢（50k 筆問答用過濾 0.6 秒），建議改用精確搜尋並補上存檔，待確認。",
     "5.1.7 其餘項目：完整流程各階段（總結、LLM 首 token 與 token／秒）的延遲與記憶體。",
     "閾值擋掉約 3 成可回答題、新舊衝突在測試集只答對 1/4：增加無答案題後重新評估閾值，並考慮寫入時標記被取代的記憶。"
   ],
@@ -1577,7 +1580,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "5.1.2", "name": "Candidate Shortlist & Environment Setup", "progress": "完成：首輪名單與效能量測" },
     { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "完成：201 題測試問題與標準答案，κ 0.90" },
     { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "完成：390 場對話、641 筆記憶（Qwen3-4B），覆蓋 98%" },
-    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "完成：ChromaDB 過濾與精確搜尋一致、不跨人，HNSW Recall@10 ≥ 0.996" },
+    { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "完成：ChromaDB 過濾與精確搜尋一致、不跨人，HNSW Recall@10 ≥ 0.996；2026-11-09 依 5.1.7 改用精確搜尋，重跑檢查通過" },
     { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "完成：完整問答引用全部正確，無答案題 100% 拒答，約 3 成可回答題被閾值擋下（gate＋0.849）" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "進行中：檢索階段與向量庫規模測試完成（瓶頸是問題 Embedding；ChromaDB 過濾在 50k 筆時 0.6 秒）" },
     { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "完成（精確搜尋）：開發集、閾值校準、測試集；HNSW 與 ranx 交叉驗證未做" },
@@ -2497,6 +2500,63 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     { "id": "2026-11-08_model-selection", "relation": "採用的 Embedding 模型" }
   ]
 }
+},{"id":"2026-11-09_numpy-store-check","record":{
+  "title": "向量庫改用精確搜尋：存檔重開後的一致性檢查",
+  "date": "2026-11-09",
+  "task": "5.1.5",
+  "type": "指標評估",
+  "status": "通過",
+  "backfilled": false,
+  "purpose": "產品向量庫從 ChromaDB 改成精確搜尋（NumpyStore）後，存檔、關閉、重新開啟的結果，是否和精確基準完全一致？",
+  "environment": [
+    "Nano，CPU；沿用測試集記憶庫評估存下的向量（20261108-005438_retrieval_eval_memories），641 筆記憶、120 題、6 個模型",
+    "NumpyStore 存檔格式：每個模型一個資料夾（meta.json、vectors.f32、records.jsonl）",
+    "run_id 20261109-142603_store_check"
+  ],
+  "method": [
+    "uv run memrag store check results/runs/20261108-005438_retrieval_eval_memories --store numpy",
+    "寫入、重複寫入 50 筆（冪等），關閉後從磁碟重新開啟，再和精確基準比較：每題的過濾加 300 組隨機過濾接受的記憶、只搜本人時的跨人次數、Recall@10"
+  ],
+  "results": [
+    {
+      "kind": "table",
+      "caption": "NumpyStore（存檔重開後）對精確基準",
+      "columns": ["模型", "建索引", "磁碟", "重開筆數", "過濾不一致", "跨人", "Recall@10 不過濾", "Recall@10 只搜本人", "Recall@10 本人＋過濾"],
+      "numeric": [1, 2, 3, 4, 5, 6, 7, 8],
+      "rows": [
+        ["ruri-v3-30m", "0.04 s", "0.84 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["ruri-v3-130m", "0.04 s", "1.47 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["ruri-v3-310m", "0.05 s", "2.10 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["qwen3-emb-0.6b", "0.07 s", "2.72 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["e5-small", "0.04 s", "1.16 MiB", "641", "0", "0", "1.000", "1.000", "1.000"],
+        ["bge-base-zh-v1.5（對照組）", "0.05 s", "2.10 MiB", "641", "0", "0", "1.000", "1.000", "1.000"]
+      ]
+    },
+    {
+      "kind": "list",
+      "items": [
+        "存檔重開後筆數不變、重複寫入不增加；過濾與精確基準完全一致，不跨人；精確搜尋所以 Recall@10 都是 1.000（ChromaDB 不過濾時是 0.996–1.000）。",
+        "建索引 0.04–0.07 秒、磁碟 0.8–2.7 MiB，都比 ChromaDB（0.58–0.74 秒、2.0–4.3 MiB）小。",
+        "產品向量庫已用新格式重建（ruri-v3-130m，641 筆，寫入 0.05 秒）；ラーメン那題的搜尋排序和之前相同。重新計算向量時分數會有小數第三位的差異（例如 0.862 → 0.860），不影響排序，但接近閾值 0.849 的記憶可能有微小變動。",
+        "單元測試另外涵蓋：重跑不寫檔、內容改變時整份重寫、寫到一半中斷時開啟會修復、拒絕別的模型或維度。"
+      ]
+    }
+  ],
+  "conclusion": [
+    "精確搜尋通過 5.1.5 的全部檢查，產品改用它（pipeline.yaml 的 retrieval.store: numpy），ChromaDB 保留為可選設定。"
+  ],
+  "next": [
+    "5.1.7 其餘項目：完整流程各階段的延遲與記憶體。"
+  ],
+  "sources": [
+    { "text": "results/runs/20261109-142603_store_check/" },
+    { "text": "src/memrag/infrastructure/vectorstore/numpy_store.py、tests/unit/infrastructure/test_numpy_store.py" }
+  ],
+  "related": [
+    { "id": "2026-11-09_retrieval-profile", "relation": "改用精確搜尋的理由（規模測試）" },
+    { "id": "2026-11-08_vector-store-check", "relation": "同一套檢查，當時是 ChromaDB" }
+  ]
+}
 },{"id":"2026-11-09_retrieval-profile","record":{
   "title": "檢索階段與向量庫規模：Top-k、CPU／GPU、ChromaDB 對精確搜尋",
   "date": "2026-11-09",
@@ -2633,7 +2693,8 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
   "related": [
     { "id": "2026-11-08_vector-store-check", "relation": "641 筆時 ChromaDB 與精確搜尋結果一致；這次看資料量變大的情況" },
     { "id": "2026-11-09_answer-pipeline", "relation": "問答流程用的過濾與 Top-k 5" },
-    { "id": "2026-11-07_load-probe", "relation": "Embedding 模型的載入與延遲量測" }
+    { "id": "2026-11-07_load-probe", "relation": "Embedding 模型的載入與延遲量測" },
+    { "id": "2026-11-09_numpy-store-check", "relation": "決定改用精確搜尋後的一致性檢查（通過）" }
   ]
 }
 }]}</script>

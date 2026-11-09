@@ -134,6 +134,7 @@
   "related": [
     { "id": "2026-11-08_vector-store-check", "relation": "641 筆時 ChromaDB 與精確搜尋結果一致；這次看資料量變大的情況" },
     { "id": "2026-11-09_answer-pipeline", "relation": "問答流程用的過濾與 Top-k 5" },
-    { "id": "2026-11-07_load-probe", "relation": "Embedding 模型的載入與延遲量測" }
+    { "id": "2026-11-07_load-probe", "relation": "Embedding 模型的載入與延遲量測" },
+    { "id": "2026-11-09_numpy-store-check", "relation": "決定改用精確搜尋後的一致性檢查（通過）" }
   ]
 }
