@@ -32,7 +32,8 @@ def query_filters(q: TestQuery) -> dict[str, MemoryFilter]:
 
 
 def random_filters(records: Sequence[MemoryRecord], n: int = RANDOM_FILTERS, seed: int = 0) -> list[MemoryFilter]:
-    """Single and combined filters over persons, categories and date ranges (including open-ended ones)."""
+    """Single and combined filters over persons, categories and date ranges (including open-ended ones,
+    with and without the conversation-date fallback)."""
     rng = random.Random(seed)
     persons = sorted({r.person_id for r in records})
     out = []
@@ -50,6 +51,7 @@ def random_filters(records: Sequence[MemoryRecord], n: int = RANDOM_FILTERS, see
                 kw["date_from"] = start
             if choice in (1, 2):
                 kw["date_to"] = end
+            kw["date_fallback"] = rng.random() < 0.5
         out.append(MemoryFilter(**kw))
     return out
 

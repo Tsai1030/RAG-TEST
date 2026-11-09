@@ -25,7 +25,8 @@ def _records(n=120, seed=1):
                         event_date=date(2026, 10, 1) + timedelta(days=rng.randrange(60)) if dated else None,
                         source_turn_ids=[1])
         out.append(MemoryRecord.from_draft(d, person_id=f"p{rng.randrange(5):02d}",
-                                           conversation_date=date(2026, 10, 1), source_log_id=f"d{i}"))
+                                           conversation_date=date(2026, 10, 1) + timedelta(days=rng.randrange(40)),
+                                           source_log_id=f"d{i}"))
     return out
 
 
@@ -69,6 +70,13 @@ def test_upsert_is_idempotent_and_empty_results(stores):
     chroma.upsert(recs[:10], vecs[:10])
     assert chroma.count() == len(recs)
     assert chroma.search(vecs[0], 5, MemoryFilter(person_id="p_none")) == []
+
+
+def test_get_returns_full_records_in_order(stores):
+    recs, vecs, exact, chroma, _ = stores
+    ids = [recs[3].memory_id, "m_unknown", recs[0].memory_id]
+    assert chroma.get(ids) == [recs[3], recs[0]] == exact.get(ids)
+    assert chroma.get([]) == []
 
 
 def test_collection_guards_model_and_dimension(stores):

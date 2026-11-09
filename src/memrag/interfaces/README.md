@@ -9,3 +9,4 @@
 | `README.md` | 檔案 | 本文件：說明這個資料夾的內容 | 手動維護 | 是 |
 | `__init__.py` | 檔案 | 套件標記，內容為空 | 手動維護 | 是 |
 | `cli/` | 資料夾 | `memrag` 指令，說明見 [`cli/README.md`](cli/README.md) | — | 是 |
+| `ui/` | 資料夾 | 手動測試 UI（Gradio），說明見 [`ui/README.md`](ui/README.md) | — | 是 |

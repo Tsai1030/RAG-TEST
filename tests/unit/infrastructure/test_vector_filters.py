@@ -30,12 +30,24 @@ def test_filter_reference_semantics():
         MemoryFilter(date_from=date(2026, 11, 2), date_to=date(2026, 11, 1))
 
 
+def test_date_fallback_matches_undated_memories_by_conversation_date():
+    # RECS were told on 2026-10-05; only the undated one falls back to that day
+    flt = MemoryFilter(date_from=date(2026, 10, 4), date_to=date(2026, 10, 6), date_fallback=True)
+    assert [flt.matches(r) for r in RECS] == [False, True, False]
+    assert [MemoryFilter(date_to=date(2026, 10, 4), date_fallback=True).matches(r) for r in RECS] == [True, False, False]
+    # Without a date bound the fallback changes nothing
+    assert MemoryFilter(date_fallback=True).matches(RECS[1])
+
+
 def test_to_where():
     assert to_where(None) is None and to_where(MemoryFilter()) is None
     assert to_where(MemoryFilter(person_id="p01")) == {"person_id": {"$eq": "p01"}}
     w = to_where(MemoryFilter(person_id="p01", category="plan", date_to=date(2026, 11, 30)))
     assert w == {"$and": [{"person_id": {"$eq": "p01"}}, {"category": {"$eq": "plan"}},
                           {"event_date_ord": {"$gt": 0}}, {"event_date_ord": {"$lte": 20261130}}]}
+    w = to_where(MemoryFilter(date_from=date(2026, 10, 1), date_fallback=True))
+    assert w == {"$or": [{"$and": [{"event_date_ord": {"$gt": 0}}, {"event_date_ord": {"$gte": 20261001}}]},
+                         {"$and": [{"event_date_ord": {"$eq": 0}}, {"conversation_date_ord": {"$gte": 20261001}}]}]}
 
 
 def test_collection_name_is_safe_and_per_dim():

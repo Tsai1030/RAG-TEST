@@ -53,8 +53,8 @@
     },
     {
       "kind": "note",
-      "title": "還不是最終決定",
-      "text": "延遲與記憶體只有 Nano 上的載入量測，正式數字要等部署伺服器（D10）；HNSW 搜尋、完整流程與各階段量測（5.1.5–5.1.7）還沒做，所以 ADR 的狀態是「提議中」。標註由 Claude 進行，建議日後請日文母語者抽查。"
+      "title": "ADR 已採用，仍待確認的部分",
+      "text": "專案負責人 2026-11-08 同意 ADR，狀態改為「已採用」。延遲與記憶體只有 Nano 上的載入量測，正式數字要等部署伺服器（D10）；完整流程與各階段量測（5.1.6–5.1.7）的結果補在 ADR，觸發重新評估條件時改回提議中。標註由 Claude 進行，建議日後請日文母語者抽查。"
     }
   ],
   "conclusion": [
@@ -62,11 +62,11 @@
     "產品現用的 bge-base-zh-v1.5 在所有準確度指標都顯著落後，建議換成 ruri-v3-130m。"
   ],
   "next": [
-    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程與各階段量測，確認主選模型在實際流程中的表現後，ADR 改為「已採用」。"
+    "5.1.5–5.1.7：ChromaDB／HNSW、完整流程與各階段量測，確認主選模型在實際流程中的表現，結果補在 ADR 的「採用後的確認」。"
   ],
   "sources": [
     { "text": "docs/analysis/selection_report.md（選型報告）" },
-    { "text": "docs/adr/0001-embedding-model.md（ADR，提議中）" },
+    { "text": "docs/adr/0001-embedding-model.md（ADR，已採用）" },
     { "text": "results/runs/20261108-010358_selection/selection.json" },
     { "text": "configs/selection.yaml" }
   ],

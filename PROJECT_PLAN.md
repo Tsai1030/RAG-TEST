@@ -214,16 +214,16 @@ RAG TEST/
 │   │
 │   ├── application/              # 【第 2 層】Use cases
 │   │   ├── generate_dialogues.py # 人物設定 + Gold Facts → 假對話（這輪對話由 Claude 撰寫，未實作）
+│   │   ├── llm_calls.py          # LLM 呼叫共用：快取 key
 │   │   ├── summarize.py          # 結構化輸出 → 驗證 → 重試 → 對應 Gold Fact
-│   │   ├── ingest.py             # 記憶 → 向量 → 儲存
-│   │   ├── retrieve.py           # 過濾檢索
-│   │   ├── context_build.py      # 閾值後的記憶 → 送給 LLM 的文字
-│   │   ├── answer.py             # 依檢索結果產生回答與引用
-│   │   ├── pipeline.py           # 串接全流程
+│   │   ├── ingest.py             # 對話 → 總結 → 向量 → 儲存（失敗時不寫入）
+│   │   ├── answer.py             # 過濾檢索 → 閾值 → Context Build → LLM 回答 → 檢查引用（原規劃的 retrieve／context_build／pipeline 合在這裡）
 │   │   └── evaluation/
 │   │       ├── dataset_check.py  # 標準答案檢查、切分、抽樣、標註一致度
 │   │       ├── retrieval_eval.py # 精確搜尋的檢索評估：兩種記憶庫、三種過濾範圍、逐題指標、配對比較
 │   │       ├── corpus_check.py   # 對話檢查、記憶語料的驗收數字
+│   │       ├── store_check.py    # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
+│   │       ├── answer_eval.py    # 完整流程的回答檢查：該答／該拒、引用、新舊記憶
 │   │       ├── qrels.py          # 編譯 Qrels（目前在 retrieval_eval.py 內：記憶繼承事實分數＋池化判斷）
 │   │       ├── metric_runner.py  # 模型 × 設定 測試矩陣
 │   │       ├── profile_runner.py # 各階段延遲與記憶體量測
@@ -389,16 +389,17 @@ uv run memrag eval rescore results/runs/<run_id> # 標註更新後，沿用存�
 uv run memrag eval calibrate results/runs/<dev run> --write # 校準閾值，寫入 configs/thresholds.yaml
 uv run memrag eval thresholds results/runs/<test run> # 用固定閾值評估小候選集
 uv run memrag select --retrieval <test run> --thresholds <threshold run> --probe <probe run> # 依 selection.yaml 選型
-uv run memrag ingest data/01_dialogues --model ruri-v3-130m
 uv run memrag store build --model ruri-v3-130m  # 把記憶庫寫進 results/vector_db（ChromaDB）
 uv run memrag store check results/runs/<memories run> # ChromaDB 對精確搜尋：過濾一致、不跨人、HNSW Recall
 uv run memrag search "好きな食べ物" --model ruri-v3-130m --person p01 --category preference -k 5
-uv run memrag ask "田中さんの好きな食べ物は？" --person p001 --trace
+uv run memrag ingest d_p01_1027 --model ruri-v3-130m # 對話 → 總結 → 向量 → 寫入向量庫（Nano，LLM session）
+uv run memrag ask "ラーメン、今もよく食べてる？" --person p06 --today 2026-11-01 --trace # 完整問答（Nano，LLM session）
+uv run memrag eval answers --split dev        # 每題跑完整流程，檢查該答／該拒、引用與新舊記憶
 uv run memrag profile --config configs/experiments/smoke.yaml
 uv run memrag eval --config configs/experiments/full_metric.yaml
 uv run memrag report add --run <run_id>       # 新增一筆測試紀錄
 uv run memrag report build --open             # 更新並開啟網頁的測試結果分頁
-uv run memrag ui                              # 啟動手動測試 UI
+uv run memrag ui                              # 啟動手動測試 UI（先 uv sync --extra ui，只綁定 127.0.0.1）
 ```
 
 所有指令都支援 `--json`，方便接腳本；錯誤訊息要指出是哪個階段、哪筆資料出錯。Nano 的非互動 SSH 找不到 `uv`，遠端執行時要用 `~/.local/bin/uv`，由 `nano_run.ps1` 處理。
@@ -700,23 +701,30 @@ flowchart LR
 **檢索到回答的流程**
 
 ```text
-Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取 Top-k
+Query + prefix → Embedding → person_id／日期過濾 → cosine 排序取 Top-k
 → 閾值過濾 → Context Build → LLM 回答 → 檢查引用
 ```
 
 - **沒有記憶通過閾值：** 程式直接回傳拒答文字「関連する情報はありません」，不呼叫 LLM
 - **有記憶通過閾值：** LLM 仍可判斷這些記憶沒有回答到問題，回傳相同的拒答文字，作為第二層防線
 - **尚未校準的模型：** 不套用閾值，並在 trace 標示 `uncalibrated`
+- **過濾的用法（2026-11-08 依開發集決定）：** 一定依 `person_id` 過濾；日期過濾在記憶沒有事件日期時改看記錄日（`date_fallback: true`，78% 的記憶沒有事件日期）；不使用類別過濾（總結的類別只有 75% 正確）。開發集 nDCG@10：只過濾本人 0.610、嚴格日期過濾 0.573、改看記錄日 0.739；測試集確認 0.855 對 0.595
+- **新舊記憶並存：** Context 每筆附記錄日，prompt 規定內容衝突時以記錄日較新的為準
+- **閾值的用法（2026-11-09 依開發集決定）：** 手動測試發現逐筆套用閾值會把更新後的事實擋在 Context 外（ラーメン：10/24「月に二回まで」0.836 < 0.849，LLM 只看到舊記憶）。`eval answers` 並排比較 `per_memory`（只送通過閾值的記憶）、`gate`（閾值只決定要不要呼叫 LLM，第一名通過就送全部 Top-k）與不用閾值；`gate` 每一項都不輸 `per_memory`，採用 `threshold_mode: gate`，閾值維持 0.849
+- **拒答文字：** LLM 常用自己的話拒答（「記録に…ありません」），被算成有回答；`answer.v1` 加上「只寫固定拒答文字、不可換句話說、不可斷定記憶沒寫的事」後凍結
+- **Nano 記憶體：** 2026-11-08 評估時 Nano 卡住約 3.5 小時，核心紀錄顯示最後由 OOM killer 砍掉 llama-server。原因是 llama-server 預設把處理過的 prompt 的 KV 狀態存在主記憶體（`--cache-ram` 預設 8192 MiB）；`nano_llm_session.sh` 改用 `--cache-ram 0`、問答用 `LLM_CTX=4096`、Embedding 用 CPU，並在可用記憶體低於 500 MiB 時自動停止
 
 **Context Build（固定做法，不呼叫 LLM，這輪不比較不同做法）**
 
 1. 去除內容相同的記憶
-2. 依相似度排序；超過 Token 預算時從最低分開始捨棄，預算在本任務決定後寫入 `pipeline.yaml`
-3. 格式化成 `[m_0123] 2026-11-07 preference 田中さんは…`，送給 `answer` prompt
+2. 依相似度排序；超過預算時從最低分開始捨棄，預算是 1,200 字（`pipeline.yaml` 的 `context_budget_chars`），Top-k 是 5
+3. 格式化成 `[m_…] 記録日：2026-10-27／種類：preference／日付：…／内容：…`，送給 `answer.v1` prompt
 
 **驗收：** Fake 版端到端測試可在 CI 等級時間內跑完且不需網路；真實版至少跑通 3 個日文案例（有答案、完全無關、相似但沒有答案）；同設定與同資料重跑，檢索結果一致；引用的 `memory_id` 全部存在且屬於過濾範圍內。
 
-**手動測試：** `memrag ask "..." --person p001 --trace`，或 UI 的 Ask 分頁
+**手動測試：** `memrag ask "..." --person p06 --today 2026-11-01 --trace`，或 UI 的 Ask 分頁；步驟見 `docs/manual_testing.md` 的 5.1.6 章節
+
+**狀態：** 驗收項目全部達成（2026-11-09，run_id `20261109-104034_answer_eval`，開發集＋測試集 201 題）。採用的 gate＋閾值 0.849：無效引用與過濾範圍外引用都是 0；201 題重跑檢索結果相同；三個手動案例跑通。輔助觀察（這輪不評估回答品質）：無答案題測試集 14/14 拒答；可回答題有回答 71%，約 3 成被閾值擋下（多半是時間題與全平假名的問題）；新舊衝突測試集只答對 1/4。Nano 上問題 Embedding p50 113 ms、檢索 7 ms、LLM p50 2.6 s。`answer.v1` 已凍結。
 
 ### 5.1.7 Pipeline Profiling
 
@@ -853,7 +861,7 @@ Query + prefix → Embedding → person_id/date/type 過濾 → cosine 排序取
 
 **驗收：** `selection_report.md` 與 ADR 完成；報告數字都能追溯到 `run_id`；審閱者能依文件重現主要結果。
 
-**狀態：** 依凍結規則的排名完成（`memrag select`，run_id `20261108-010358_selection`）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告（`docs/analysis/selection_report.md`，含失敗案例、穩健性檢查與 JMTEB 比較，排名相關 0.90）與 ADR 0001（提議中）已完成（2026-11-08）；5.1.5–5.1.7 在實際流程中確認、延遲與記憶體在部署伺服器確認後，ADR 改為「已採用」。
+**狀態：** 依凍結規則的排名完成（`memrag select`，run_id `20261108-010358_selection`）。5 個候選都通過硬性門檻；加權分數 ruri-v3-130m 0.920、ruri-v3-30m 0.874、ruri-v3-310m 0.751、Qwen3 0.608、e5-small 0.097，權重 ±0.05 第一名不變；前四名 nDCG 差距不顯著，依平手規則也選較輕量的 ruri-v3-130m。初步結論：主選 ruri-v3-130m、備選 ruri-v3-30m。選型報告（`docs/analysis/selection_report.md`，含失敗案例、穩健性檢查與 JMTEB 比較，排名相關 0.90）與 ADR 0001 已完成；ADR 經專案負責人同意，2026-11-08 改為「已採用」。5.1.5–5.1.7 的確認結果補在 ADR 的「採用後的確認」，觸發重新評估條件時改回提議中。
 
 ---
 

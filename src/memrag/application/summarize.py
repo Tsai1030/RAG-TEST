@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from collections import Counter
@@ -11,6 +10,7 @@ from datetime import timedelta
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from memrag.application.llm_calls import cache_key
 from memrag.domain.ports import ChatMessage, LLMProvider, PromptStore, ResponseCache
 from memrag.domain.schemas.dialogue import DialogueLog
 from memrag.domain.schemas.memory import MemoryDraft, MemoryRecord
@@ -90,11 +90,6 @@ def gold_facts_for(draft: MemoryDraft, log: DialogueLog) -> list[str]:
     return sorted(f for f, turns in log.fact_turns.items() if cited.intersection(turns))
 
 
-def _cache_key(messages: list[ChatMessage], llm: LLMProvider, schema: dict) -> str:
-    payload = json.dumps({"messages": messages, "llm": llm.info(), "schema": schema}, ensure_ascii=False, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
 def summarize_log(log: DialogueLog, user_name: str, llm: LLMProvider, prompts: PromptStore,
                   cache: ResponseCache | None = None, version: str = "v1") -> SummaryResult:
     schema = output_schema()
@@ -106,7 +101,7 @@ def summarize_log(log: DialogueLog, user_name: str, llm: LLMProvider, prompts: P
     retry = prompts.get("summarize_retry", version)
     result = SummaryResult(log.log_id)
     for _ in range(1 + MAX_RETRIES):
-        key = _cache_key(messages, llm, schema)
+        key = cache_key(messages, llm, schema)
         cached = cache.get(key) if cache else None
         raw = cached if cached is not None else llm.chat(messages, schema)
         drafts, errors = validate_output(raw, log)

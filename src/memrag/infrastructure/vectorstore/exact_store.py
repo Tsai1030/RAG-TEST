@@ -25,6 +25,9 @@ class ExactStore:
             self._records[r.memory_id] = r
             self._vectors[r.memory_id] = v
 
+    def get(self, ids: Sequence[str]) -> list[MemoryRecord]:
+        return [self._records[i] for i in ids if i in self._records]
+
     def matching_ids(self, flt: MemoryFilter) -> set[str]:
         return {i for i, r in self._records.items() if flt.matches(r)}
 

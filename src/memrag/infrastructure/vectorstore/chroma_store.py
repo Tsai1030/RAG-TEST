@@ -34,14 +34,24 @@ def to_where(flt: MemoryFilter | None) -> dict | None:
     if flt.category is not None:
         terms.append({"category": {"$eq": flt.category.value}})
     if flt.has_date:
-        terms.append({"event_date_ord": {"$gt": 0}})
-        if flt.date_from:
-            terms.append({"event_date_ord": {"$gte": int(flt.date_from.strftime("%Y%m%d"))}})
-        if flt.date_to:
-            terms.append({"event_date_ord": {"$lte": int(flt.date_to.strftime("%Y%m%d"))}})
+        dated = [{"event_date_ord": {"$gt": 0}}, *_range_terms("event_date_ord", flt)]
+        if flt.date_fallback:
+            undated = [{"event_date_ord": {"$eq": 0}}, *_range_terms("conversation_date_ord", flt)]
+            terms.append({"$or": [{"$and": dated}, {"$and": undated}]})
+        else:
+            terms.extend(dated)
     if not terms:
         return None
     return terms[0] if len(terms) == 1 else {"$and": terms}
+
+
+def _range_terms(field: str, flt: MemoryFilter) -> list[dict]:
+    terms = []
+    if flt.date_from:
+        terms.append({field: {"$gte": int(flt.date_from.strftime("%Y%m%d"))}})
+    if flt.date_to:
+        terms.append({field: {"$lte": int(flt.date_to.strftime("%Y%m%d"))}})
+    return terms
 
 
 class ChromaStore:
@@ -69,8 +79,16 @@ class ChromaStore:
                 documents=[r.content for r in batch],
                 metadatas=[{"person_id": r.person_id, "category": r.category.value,
                             "event_date_ord": r.event_date_ord or 0,
-                            "conversation_date_ord": int(r.conversation_date.strftime("%Y%m%d"))} for r in batch],
+                            "conversation_date_ord": int(r.conversation_date.strftime("%Y%m%d")),
+                            "record": r.model_dump_json()} for r in batch],
             )
+
+    def get(self, ids: Sequence[str]) -> list[MemoryRecord]:
+        if not ids:
+            return []
+        res = self._col.get(ids=list(ids), include=["metadatas"])
+        found = {i: MemoryRecord.model_validate_json(m["record"]) for i, m in zip(res["ids"], res["metadatas"])}
+        return [found[i] for i in ids if i in found]
 
     def matching_ids(self, flt: MemoryFilter) -> set[str]:
         return set(self._col.get(where=to_where(flt), include=[])["ids"])

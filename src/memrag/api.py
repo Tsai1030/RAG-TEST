@@ -5,21 +5,44 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
 from memrag import bootstrap
 from memrag.domain.ports import EmbeddingProvider
 from memrag.domain.schemas.embedding import EncodedText, ModelSpec, TextKind
 
+if TYPE_CHECKING:
+    from datetime import date
+
+    from memrag.application.answer import Answer
+    from memrag.application.ingest import IngestReport
+    from memrag.domain.schemas.dialogue import DialogueLog
+    from memrag.domain.schemas.memory import MemoryRecord
+    from memrag.domain.schemas.retrieval import MemoryFilter
+
 
 class MemRAG:
-    def __init__(self, embedder: EmbeddingProvider):
+    """The pipeline for one embedding model: ingest logs, search, ask (plan 6.1).
+
+    The vector store and the LLM are opened on first use, so embedding alone needs neither.
+    With `fake`, the embedder and the LLM are fakes and the store lives in memory.
+    """
+
+    def __init__(self, embedder: EmbeddingProvider, config: dict, fake: bool = False, store_dir: Path | None = None,
+                 use_cache: bool = True):
         self._embedder = embedder
+        self._cfg = config
+        self._fake = fake
+        self._store_dir = store_dir
+        self._use_cache = use_cache and not fake
+        self._store = self._llm = None
 
     @classmethod
-    def from_config(cls, embedding_model: str, device: str = "auto", fake: bool = False) -> MemRAG:
+    def from_config(cls, embedding_model: str, device: str = "auto", fake: bool = False,
+                    store_dir: str | Path | None = None, use_cache: bool = True) -> MemRAG:
         reg = bootstrap.registry()
-        return cls(bootstrap.embedding_provider(reg, embedding_model, device=device, fake=fake))
+        return cls(bootstrap.embedding_provider(reg, embedding_model, device=device, fake=fake),
+                   bootstrap.pipeline_config(), fake, Path(store_dir) if store_dir else None, use_cache)
 
     @property
     def embedding_model(self) -> ModelSpec:
@@ -32,6 +55,113 @@ class MemRAG:
 
     def explain_embedding(self, text: str, kind: TextKind = "query") -> EncodedText:
         return self._embedder.explain(text, kind)
+
+    @property
+    def store(self):
+        if self._store is None:
+            spec = self.embedding_model
+            self._store = bootstrap.vector_store(spec.name, spec.dim, fake=self._fake, path=self._store_dir)
+        return self._store
+
+    @property
+    def llm(self):
+        if self._llm is None:
+            self._llm = bootstrap.llm_provider(self._cfg, self._fake)
+        return self._llm
+
+    @property
+    def threshold(self) -> float | None:
+        """configs/thresholds.yaml for this model; None when uncalibrated or switched off."""
+        if not self._cfg["answer"]["use_threshold"]:
+            return None
+        return bootstrap.thresholds().get("thresholds", {}).get(self.embedding_model.name)
+
+    def _cache(self):
+        return bootstrap.response_cache(self._cfg) if self._use_cache else None
+
+    def index(self, memories: Sequence[MemoryRecord]) -> int:
+        """Embed and upsert memories (idempotent); returns the store size."""
+        if memories:
+            self.store.upsert(memories, self._embedder.embed_documents([m.content for m in memories]))
+        return self.store.count()
+
+    def ingest_log(self, log: DialogueLog | str | Path, user_name: str | None = None) -> IngestReport:
+        """Summarize one dialogue log, embed the memories and write them to the store.
+
+        `log` is a DialogueLog or the path of one as JSON. Nothing is written when the
+        summary fails validation after the retries; the report says why.
+        """
+        from memrag.application.ingest import ingest_log
+        from memrag.domain.errors import LLMUnavailableError, PipelineError
+        from memrag.domain.schemas.dialogue import DialogueLog
+
+        if not isinstance(log, DialogueLog):
+            log = DialogueLog.model_validate_json(Path(log).read_text(encoding="utf-8"))
+        if user_name is None:
+            user_name = _user_handles(load_gold_set()).get(log.person_id, "ユーザーさん")
+        try:
+            return ingest_log(log, user_name, self._embedder, self.store, self.llm, bootstrap.prompt_store(),
+                              self._cache(), self._cfg["summarize"]["prompt_version"])
+        except LLMUnavailableError as e:
+            raise PipelineError("summarize", log.log_id, str(e)) from e
+
+    def search(self, text: str, filters: MemoryFilter | None = None, top_k: int = 5) -> list[tuple[MemoryRecord, float]]:
+        """Filtered top-k as (memory, cosine score), best first. The filter is used as given."""
+        hits = self.store.search(self._embedder.embed_queries([text])[0], top_k, filters)
+        records = {r.memory_id: r for r in self.store.get([h.memory_id for h in hits])}
+        return [(records[h.memory_id], h.score) for h in hits]
+
+    def pipeline_filter(self, filters: MemoryFilter | None) -> MemoryFilter:
+        """The filter `ask` uses: the 5.1.6 decisions in pipeline.yaml (date fallback, no category)."""
+        from memrag.domain.schemas.retrieval import MemoryFilter
+
+        r = self._cfg["retrieval"]
+        flt = filters or MemoryFilter()
+        return flt.model_copy(update={"date_fallback": r["date_fallback"],
+                                      **({} if r["category_filter"] else {"category": None})})
+
+    def ask(self, question: str, filters: MemoryFilter | None = None, today: date | None = None,
+            use_threshold: bool = True, threshold_mode: str | None = None) -> Answer:
+        """Answer from the memories with cited memory_ids, the trace and per-stage timings.
+
+        `threshold_mode` (per_memory | gate) defaults to pipeline.yaml's answer.threshold_mode.
+        """
+        from datetime import date as date_cls
+
+        from memrag.application.answer import AskSettings, ask
+        from memrag.domain.errors import LLMUnavailableError, PipelineError
+
+        a = self._cfg["answer"]
+        settings = AskSettings(self._cfg["retrieval"]["top_k"], self.threshold if use_threshold else None,
+                               a["context_budget_chars"], self._cfg["refusal_text"], a["prompt_version"],
+                               threshold_mode or a["threshold_mode"])
+        try:
+            return ask(question, self.pipeline_filter(filters), today or date_cls.today(), self._embedder,
+                       self.store, self.llm, bootstrap.prompt_store(), settings, self._cache())
+        except LLMUnavailableError as e:
+            raise PipelineError("answer", repr(question), str(e)) from e
+
+    def manifest(self) -> dict:
+        """What identifies a pipeline run: model, threshold, prompts, settings, LLM."""
+        spec = self.embedding_model
+        prompts = bootstrap.prompt_store()
+        th = bootstrap.thresholds()
+        return {
+            "embedding_model": {"name": spec.name, "hf_id": spec.hf_id, "revision": spec.revision, "dim": spec.dim,
+                                "query_prefix": spec.query_prefix, "document_prefix": spec.document_prefix},
+            "threshold": {"value": self.threshold, "calibration_run": th.get("calibration_run"),
+                          "uncalibrated": self.threshold is None},
+            "prompts": {n: {"version": v, "sha256": prompts.get(n, v).sha256} for n, v in (
+                ("summarize", self._cfg["summarize"]["prompt_version"]),
+                ("answer", self._cfg["answer"]["prompt_version"]))},
+            "retrieval": self._cfg["retrieval"], "answer": self._cfg["answer"],
+            "llm": {**self._cfg["llm"], **self.llm.info()}, "fake": self._fake,
+        }
+
+    def close(self) -> None:
+        if self._store is not None:
+            self._store.close()
+            self._store = None
 
 
 def list_models(selection: str = "all") -> list[dict]:
@@ -188,19 +318,51 @@ def _summary_dict(result) -> dict:
     }
 
 
-def summarize_dialogue(log_id: str, fake: bool = False, use_cache: bool = True) -> dict:
-    """Summarize one dialogue log into memories, with every attempt and its validation errors."""
+def summarize_dialogue(log_id: str | None = None, fake: bool = False, use_cache: bool = True,
+                       log_json: str | None = None) -> dict:
+    """Summarize one dialogue log into memories, with every attempt and its validation errors.
+
+    The log is one of data/01_dialogues by id, or `log_json` (a pasted log).
+    """
+    from pydantic import ValidationError
+
     from memrag.application.summarize import summarize_log
     from memrag.domain.errors import ConfigError
+    from memrag.domain.schemas.dialogue import DialogueLog
 
-    log = next((lg for lg in load_dialogues() if lg.log_id == log_id), None)
-    if log is None:
-        raise ConfigError(f"dialogue {log_id!r} not found in {bootstrap.DIALOGUES}")
+    if log_json:
+        try:
+            log = DialogueLog.model_validate_json(log_json)
+        except ValidationError as e:
+            raise ConfigError(f"the pasted log is not a valid dialogue: {e}") from e
+    else:
+        log = next((lg for lg in load_dialogues() if lg.log_id == log_id), None)
+        if log is None:
+            raise ConfigError(f"dialogue {log_id!r} not found in {bootstrap.DIALOGUES}")
     cfg = bootstrap.pipeline_config()
     cache = bootstrap.response_cache(cfg) if use_cache and not fake else None
-    result = summarize_log(log, _user_handles(load_gold_set())[log.person_id], bootstrap.llm_provider(cfg, fake),
-                           bootstrap.prompt_store(), cache, cfg["summarize"]["prompt_version"])
+    result = summarize_log(log, _user_handles(load_gold_set()).get(log.person_id, "ユーザーさん"),
+                           bootstrap.llm_provider(cfg, fake), bootstrap.prompt_store(), cache,
+                           cfg["summarize"]["prompt_version"])
     return _summary_dict(result)
+
+
+FEEDBACK = Path("results") / "feedback" / "query_candidates.jsonl"
+
+
+def save_feedback(text: str, person_id: str, problem: str, model: str = "", expected: str = "") -> dict:
+    """Store a problem query found by hand as a candidate. Candidates join the query set only after review."""
+    from memrag.domain.errors import ConfigError
+    from memrag.infrastructure.storage.manifest import append_jsonl
+
+    if not text.strip() or not person_id.strip():
+        raise ConfigError("a feedback candidate needs the query text and the person_id")
+    path = bootstrap.project_root() / FEEDBACK
+    path.parent.mkdir(parents=True, exist_ok=True)
+    row = {"created": datetime.now().isoformat(timespec="seconds"), "text": text.strip(), "person_id": person_id.strip(),
+           "problem": problem.strip(), "model": model, "expected": expected.strip(), "status": "unreviewed"}
+    append_jsonl(path, row)
+    return {"path": str(path), **row}
 
 
 def build_memory_corpus(fake: bool = False, limit: int | None = None, note: str = "") -> dict:
@@ -555,44 +717,202 @@ def build_index(model: str, device: str = "auto", fake: bool = False) -> dict:
     """Embed the frozen memory corpus with `model` and upsert it into results/vector_db/ (idempotent)."""
     import time
 
-    spec = bootstrap.registry().get(model)
     memories = load_memories()
-    embedder = bootstrap.embedding_provider(bootstrap.registry(), model, device=device, fake=fake)
+    rag = MemRAG.from_config(model, device=device, fake=fake)
     start = time.perf_counter()
-    vectors = embedder.embed_documents([m.content for m in memories])
+    vectors = rag.embed([m.content for m in memories], kind="document")
     embed_s = time.perf_counter() - start
-    store = bootstrap.vector_store(model, spec.dim)
     start = time.perf_counter()
-    store.upsert(memories, vectors)
-    out = {"model": model, "memories": store.count(), "embed_s": round(embed_s, 2),
-           "upsert_s": round(time.perf_counter() - start, 2), "path": str(bootstrap.VECTOR_DB)}
-    store.close()
+    rag.store.upsert(memories, vectors)
+    out = {"model": model, "memories": rag.store.count(), "embed_s": round(embed_s, 2),
+           "upsert_s": round(time.perf_counter() - start, 2), "path": "（記憶體）" if fake else str(bootstrap.VECTOR_DB)}
+    rag.close()
     return out
+
+
+_HIT_FIELDS = {"memory_id", "person_id", "category", "event_date", "conversation_date", "content"}
+
+
+def _open_index(model: str, device: str, fake: bool) -> MemRAG:
+    """The model's index; a fake run indexes the frozen corpus in memory first."""
+    from memrag.domain.errors import ConfigError
+
+    rag = MemRAG.from_config(model, device=device, fake=fake)
+    if fake:
+        rag.index(load_memories())
+    elif rag.store.count() == 0:
+        rag.close()
+        raise ConfigError(f"no index for {model}; run `memrag store build --model {model}` first")
+    return rag
 
 
 def search_memories(text: str, model: str, person_id: str | None = None, category: str | None = None,
                     date_from: str | None = None, date_to: str | None = None, k: int = 5,
                     device: str = "auto", fake: bool = False) -> dict:
     """Search the index built by `build_index`; the query gets the model's query prefix."""
-    from memrag.domain.errors import ConfigError
     from memrag.domain.schemas.retrieval import MemoryFilter
 
-    spec = bootstrap.registry().get(model)
     flt = MemoryFilter(person_id=person_id, category=category, date_from=date_from, date_to=date_to)
-    store = bootstrap.vector_store(model, spec.dim)
-    if store.count() == 0:
-        store.close()
-        raise ConfigError(f"no index for {model}; run `memrag store build --model {model}` first")
-    embedder = bootstrap.embedding_provider(bootstrap.registry(), model, device=device, fake=fake)
-    hits = store.search(embedder.embed_queries([text])[0], k, flt)
-    store.close()
-    memories = {m.memory_id: m for m in load_memories()}
+    rag = _open_index(model, device, fake)
+    hits = rag.search(text, flt, k)
+    rag.close()
     return {
-        "query": embedder.explain(text, "query").encoded_text, "model": model,
-        "filter": flt.model_dump(mode="json", exclude_none=True),
-        "hits": [{"score": round(h.score, 4), **memories[h.memory_id].model_dump(
-            mode="json", include={"memory_id", "person_id", "category", "event_date", "content"})} for h in hits],
+        "query": rag.explain_embedding(text, "query").encoded_text, "model": model,
+        "filter": flt.model_dump(mode="json", exclude_none=True, exclude_defaults=True),
+        "hits": [{"score": round(s, 4), **m.model_dump(mode="json", include=_HIT_FIELDS)} for m, s in hits],
     }
+
+
+def answer_dict(answer: Answer, records: dict | None = None) -> dict:
+    """An Answer as JSON-ready data; `records` adds the memory text to each retrieved hit."""
+    out = asdict(answer)
+    out["filter"] = answer.filter.model_dump(mode="json", exclude_defaults=True)
+    out["uncalibrated"] = answer.uncalibrated
+    if records:
+        for hit in out["retrieved"]:
+            hit.update(records[hit["memory_id"]].model_dump(mode="json", include=_HIT_FIELDS - {"memory_id"}))
+    return out
+
+
+def ask_question(text: str, model: str, person_id: str | None = None, date_from: str | None = None,
+                 date_to: str | None = None, today: str | None = None, use_threshold: bool = True,
+                 device: str = "auto", fake: bool = False, threshold_mode: str | None = None) -> dict:
+    """One question through the whole pipeline, with the trace (plan 5.1.6, `memrag ask`)."""
+    from datetime import date
+
+    from memrag.domain.schemas.retrieval import MemoryFilter
+
+    rag = _open_index(model, device, fake)
+    answer = rag.ask(text, MemoryFilter(person_id=person_id, date_from=date_from, date_to=date_to),
+                     date.fromisoformat(today) if today else None, use_threshold, threshold_mode)
+    records = {r.memory_id: r for r in rag.store.get([h["memory_id"] for h in answer.retrieved])}
+    out = {**answer_dict(answer, records), "manifest": rag.manifest()}
+    rag.close()
+    return out
+
+
+def ingest_dialogues(model: str, log_ids: Sequence[str] = (), path: str | None = None, device: str = "auto",
+                     fake: bool = False, note: str = "") -> dict:
+    """Summarize dialogue logs and write their memories to the model's store (plan 5.1.6).
+
+    `path`: one log as JSON; otherwise the logs in data/01_dialogues with these ids (all
+    when empty). Writes reports.jsonl and manifest.json to results/runs/<run_id>_ingest/.
+    """
+    from memrag.domain.errors import ConfigError
+    from memrag.domain.schemas.dialogue import DialogueLog
+    from memrag.infrastructure.storage.manifest import append_jsonl, environment_info, new_run_dir, write_json
+
+    if path:
+        logs = [DialogueLog.model_validate_json(Path(path).read_text(encoding="utf-8"))]
+    else:
+        logs = [lg for lg in load_dialogues() if not log_ids or lg.log_id in log_ids]
+        missing = set(log_ids) - {lg.log_id for lg in logs}
+        if missing:
+            raise ConfigError(f"dialogues not found: {sorted(missing)}")
+    root = bootstrap.project_root()
+    rag = MemRAG.from_config(model, device=device, fake=fake)
+    run_dir = new_run_dir(root, "ingest" + ("_fake" if fake else ""))
+    manifest = {"run_id": run_dir.name, "kind": "ingest", "started": datetime.now().isoformat(timespec="seconds"),
+                "note": note, "logs": len(logs), "source": path or str(bootstrap.DIALOGUES), **rag.manifest(),
+                "environment": environment_info(root)}
+    write_json(run_dir / "manifest.json", manifest)
+    handles = _user_handles(load_gold_set())
+    reports = []
+    for log in logs:
+        report = rag.ingest_log(log, handles.get(log.person_id, "ユーザーさん"))
+        append_jsonl(run_dir / "reports.jsonl", asdict(report))
+        reports.append(report)
+    out = {"accepted": sum(r.accepted for r in reports), "failed": [r.log_id for r in reports if not r.ok],
+           "retries": sum(r.retries for r in reports), "store_count": rag.store.count()}
+    manifest.update(finished=datetime.now().isoformat(timespec="seconds"), **out)
+    write_json(run_dir / "manifest.json", manifest)
+    rag.close()
+    return {"run_dir": str(run_dir), "logs": len(logs), **out,
+            "reports": [asdict(r) for r in reports]}
+
+
+def _update_pairs(gs, memories) -> dict[str, tuple[set[str], set[str]]]:
+    """Queries about a changed fact: memories of the new fact and of the one it replaced."""
+    replaced = {f.fact_id: f.supersedes for f in gs.facts if f.supersedes}
+    grades: dict[str, dict[str, int]] = {}
+    for label in gs.labels:
+        grades.setdefault(label.query_id, {})[label.fact_id] = label.grade
+    out = {}
+    for qid, g in grades.items():
+        for new, old in replaced.items():
+            if g.get(new) == 2 and g.get(old):
+                out[qid] = ({m.memory_id for m in memories if new in m.gold_fact_ids},
+                            {m.memory_id for m in memories if old in m.gold_fact_ids})
+    return out
+
+
+# variant -> (use_threshold, threshold_mode); gate+llm reuses llm_only's cached LLM answers
+# whenever the top memory passes, since the prompt is the same.
+ANSWER_VARIANTS = {
+    "threshold+llm": (True, "per_memory"),
+    "gate+llm": (True, "gate"),
+    "llm_only": (False, "per_memory"),
+}
+
+
+def evaluate_answers(model: str, split: str | None = None, limit: int | None = None, device: str = "auto",
+                     fake: bool = False, note: str = "") -> dict:
+    """Plan 5.1.6 acceptance on the query set: every query through `ask`, as of the day it was asked.
+
+    Two variants: the plan's threshold + LLM, and the LLM alone (no threshold). The filter
+    is the query's own, through `pipeline_filter`. Indexes the frozen corpus first
+    (idempotent), checks that a second retrieval pass gives the same results, and writes
+    answers.jsonl, metrics.json and manifest.json to results/runs/<run_id>_answer_eval/.
+    """
+    import hashlib
+
+    from memrag.application.evaluation.answer_eval import score_answer, summarize
+    from memrag.domain.schemas.retrieval import MemoryFilter
+    from memrag.infrastructure.storage.manifest import append_jsonl, environment_info, new_run_dir, write_json
+
+    root = bootstrap.project_root()
+    gs = load_gold_set()
+    memories = load_memories()
+    data, corpus_info = _retrieval_input("memories", split)
+    queries = data.queries[:limit] if limit else data.queries
+    updates = _update_pairs(gs, memories)
+    rag = MemRAG.from_config(model, device=device, fake=fake)
+    rag.index(memories)
+    records = {m.memory_id: m for m in memories}
+    run_dir = new_run_dir(root, "answer_eval" + ("_fake" if fake else ""))
+    manifest = {"run_id": run_dir.name, "kind": "answer_eval", "started": datetime.now().isoformat(timespec="seconds"),
+                "note": note, **corpus_info, "queries": len(queries), "variants": list(ANSWER_VARIANTS),
+                "store": "in-memory" if fake else str(bootstrap.VECTOR_DB), **rag.manifest(),
+                "served_model": None if fake else rag.llm.served_model(),
+                "dialogues_sha256": hashlib.sha256((root / bootstrap.DIALOGUES).read_bytes()).hexdigest(),
+                "environment": environment_info(root)}
+    write_json(run_dir / "manifest.json", manifest)
+    rows: dict[str, list[dict]] = {v: [] for v in ANSWER_VARIANTS}
+    first: dict[str, list] = {}
+    for q in queries:
+        f = q.filters
+        flt = MemoryFilter(person_id=q.person_id, category=f.category, date_from=f.date_from, date_to=f.date_to)
+        for variant, (use_threshold, mode) in ANSWER_VARIANTS.items():
+            answer = rag.ask(q.text, flt, q.asked_on, use_threshold, mode)
+            row = {"variant": variant, **score_answer(q, answer, data.grades[q.query_id], records,
+                                                      updates.get(q.query_id)),
+                   "timings_ms": answer.timings_ms, "cached": answer.cached}
+            append_jsonl(run_dir / "answers.jsonl", row)
+            rows[variant].append(row)
+        first[q.query_id] = [(h["memory_id"], h["score"]) for h in answer.retrieved]
+    repeat = [q.query_id for q in queries if first[q.query_id] != [
+        (m.memory_id, round(s, 4)) for m, s in rag.search(q.text, rag.pipeline_filter(MemoryFilter(
+            person_id=q.person_id, category=q.filters.category, date_from=q.filters.date_from,
+            date_to=q.filters.date_to)), rag._cfg["retrieval"]["top_k"])]]
+    metrics = {"variants": {v: summarize(r) for v, r in rows.items()},
+               "by_split": {v: {s: summarize([r for r in rs if r["split"] == s]) for s in ("dev", "test")}
+                            for v, rs in rows.items()},
+               "retrieval_repeat": {"queries": len(queries), "different": repeat}}
+    write_json(run_dir / "metrics.json", metrics)
+    manifest["finished"] = datetime.now().isoformat(timespec="seconds")
+    write_json(run_dir / "manifest.json", manifest)
+    rag.close()
+    return {"run_dir": str(run_dir), **metrics}
 
 
 def check_vector_store(run_dir: str, note: str = "") -> dict:

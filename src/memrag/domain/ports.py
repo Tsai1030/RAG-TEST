@@ -49,6 +49,10 @@ class VectorStore(Protocol):
 
     def search(self, vector: Vector, k: int, flt: MemoryFilter | None = None) -> list[SearchHit]: ...
 
+    def get(self, ids: Sequence[str]) -> list[MemoryRecord]:
+        """The stored records, in the order of `ids`; unknown ids are skipped."""
+        ...
+
     def matching_ids(self, flt: MemoryFilter) -> set[str]:
         """Every stored memory the filter accepts, without ranking (to check filter translation)."""
         ...

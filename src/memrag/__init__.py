@@ -3,6 +3,8 @@
 from memrag.api import (
     MemRAG,
     annotation_agreement,
+    answer_dict,
+    ask_question,
     assign_dataset_splits,
     build_index,
     build_memory_corpus,
@@ -10,8 +12,10 @@ from memrag.api import (
     check_environment,
     check_vector_store,
     download_models,
+    evaluate_answers,
     evaluate_retrieval,
     evaluate_thresholds,
+    ingest_dialogues,
     list_models,
     load_dialogues,
     load_gold_set,
@@ -19,6 +23,7 @@ from memrag.api import (
     make_second_pass_sample,
     probe_models,
     rescore_retrieval,
+    save_feedback,
     search_memories,
     select_models,
     show_query,
@@ -26,12 +31,16 @@ from memrag.api import (
     validate_dataset,
     validate_dialogues,
 )
-from memrag.domain.errors import ConfigError, MemRAGError, ModelNotAvailableError
+from memrag.domain.errors import ConfigError, MemRAGError, ModelNotAvailableError, PipelineError
 from memrag.domain.schemas.embedding import EncodedText, ModelSpec
+from memrag.domain.schemas.retrieval import MemoryFilter
 
 __all__ = [
     "MemRAG",
+    "MemoryFilter",
     "annotation_agreement",
+    "answer_dict",
+    "ask_question",
     "assign_dataset_splits",
     "build_index",
     "build_memory_corpus",
@@ -39,8 +48,10 @@ __all__ = [
     "check_environment",
     "check_vector_store",
     "download_models",
+    "evaluate_answers",
     "evaluate_retrieval",
     "evaluate_thresholds",
+    "ingest_dialogues",
     "list_models",
     "load_dialogues",
     "load_gold_set",
@@ -48,6 +59,7 @@ __all__ = [
     "make_second_pass_sample",
     "probe_models",
     "rescore_retrieval",
+    "save_feedback",
     "search_memories",
     "select_models",
     "show_query",
@@ -57,6 +69,7 @@ __all__ = [
     "ConfigError",
     "MemRAGError",
     "ModelNotAvailableError",
+    "PipelineError",
     "EncodedText",
     "ModelSpec",
 ]

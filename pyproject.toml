@@ -20,6 +20,11 @@ dependencies = [
 [project.scripts]
 memrag = "memrag.interfaces.cli.main:main"
 
+[project.optional-dependencies]
+ui = [
+    "gradio==5.9.1",
+]
+
 [dependency-groups]
 dev = ["pytest", "import-linter"]
 

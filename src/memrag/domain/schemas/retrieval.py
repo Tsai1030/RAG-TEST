@@ -2,7 +2,8 @@
 
 `MemoryFilter.matches` is the reference meaning of a filter: every VectorStore must
 return exactly the memories it accepts. A date bound excludes memories without an
-event date.
+event date, unless `date_fallback` is set: then such a memory is matched by the day
+it was told (conversation_date). The pipeline uses the fallback (decided in 5.1.6).
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ class MemoryFilter(BaseModel):
     category: Category | None = None
     date_from: date | None = None
     date_to: date | None = None
+    date_fallback: bool = False
 
     @model_validator(mode="after")
     def _range(self) -> MemoryFilter:
@@ -39,11 +41,12 @@ class MemoryFilter(BaseModel):
         if self.category is not None and m.category != self.category:
             return False
         if self.has_date:
-            if m.event_date is None:
+            day = m.event_date or (m.conversation_date if self.date_fallback else None)
+            if day is None:
                 return False
-            if self.date_from and m.event_date < self.date_from:
+            if self.date_from and day < self.date_from:
                 return False
-            if self.date_to and m.event_date > self.date_to:
+            if self.date_to and day > self.date_to:
                 return False
         return True
 

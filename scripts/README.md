@@ -59,4 +59,15 @@ nohup bash scripts/nano_measure.sh "uv run memrag models probe" "uv run pytest -
 
 ```bash
 nohup bash scripts/nano_llm_session.sh "uv run memrag corpus build" > /tmp/rag_llm.log 2>&1 &
+# 問答階段：context 用 4096、Embedding 用 CPU，省記憶體
+LLM_CTX=4096 nohup bash scripts/nano_llm_session.sh "uv run memrag eval answers --split dev --device cpu" > /tmp/rag_llm.log 2>&1 &
 ```
+
+| 環境變數 | 預設值 | 說明 |
+|---|---|---|
+| `LLM_CTX` | `pipeline.yaml` 的 `context`（8192） | LLM 的 context 長度；問答只需要 4096，KV cache 約省 0.6 GB |
+| `MIN_MEM_MB` | `500` | 記憶體保護：可用記憶體低於這個值時停掉正在跑的指令並結束這次階段（照樣重啟服務） |
+
+- **為什麼要記憶體保護：** Nano 的 8 GB 由 CPU 與 GPU 共用，用完時會整台卡住好幾個小時，系統才砍掉程序（2026-11-08 12:14 卡住，15:55 才由 OOM killer 砍掉 llama-server），所以在卡住之前主動停止。
+- **`--cache-ram 0`：** 這版 llama-server 預設會把處理過的 prompt 的 KV 狀態存在主記憶體，上限 8192 MiB，比 Nano 的記憶體還大。問答評估每題的 prompt 都不同，會一直累積到記憶體用完（2026-11-09 評估開始兩分鐘就觸發記憶體保護），所以關掉。重複的 prompt 由 memrag 自己的回應快取處理。
+- **紀錄：** 每個指令結束時印出 `== exit <代碼> (MemAvailable min <MiB>)`；因記憶體不足停止時印出 `session ended: low memory`，結束碼 3。

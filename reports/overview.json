@@ -1,6 +1,6 @@
 {
   "headline": "初步選型：主選 ruri-v3-130m，備選 ruri-v3-30m；產品現用的 bge 在所有準確度指標都顯著落後",
-  "summary": "測試集 120 題的正式評估完成，閾值與選型規則都在測試前凍結。LLM 總結的記憶庫上，ruri-v3-310m、ruri-v3-130m、Qwen3、ruri-v3-30m 的 nDCG@10 都在 0.86–0.87，差距不顯著；依凍結的加權規則，ruri-v3-130m 第一（Recall@5 最高、小候選集誤擋率最低、記憶體最省），權重 ±0.05 時第一名不變。HNSW、完整流程與部署伺服器上的效能還沒驗證，所以是初步結論。",
+  "summary": "測試集 120 題的正式評估完成，閾值與選型規則都在測試前凍結。LLM 總結的記憶庫上，ruri-v3-310m、ruri-v3-130m、Qwen3、ruri-v3-30m 的 nDCG@10 都在 0.86–0.87，差距不顯著；依凍結的加權規則，ruri-v3-130m 第一（Recall@5 最高、小候選集誤擋率最低、記憶體最省），權重 ±0.05 時第一名不變。HNSW（5.1.5）與完整問答流程（5.1.6）已確認不影響結論；部署伺服器上的效能還沒驗證，所以仍是初步結論。",
   "conclusion": "主選 ruri-v3-130m（Apache-2.0）；備選 ruri-v3-30m（最快，適合只有 CPU 的環境，但表記差異題較弱）。產品現用的 bge-base-zh-v1.5 建議替換。",
   "findings": [
     "測試集 nDCG@10（LLM 記憶庫、只搜本人）：ruri-v3-310m 0.872、ruri-v3-130m 0.864、Qwen3 0.863、ruri-v3-30m 0.859、e5-small 0.815、bge 0.690；前四名差距不顯著，e5 與 bge 顯著較差。",
@@ -10,7 +10,8 @@
     "日期／類別過濾要看總結 LLM 抽 metadata 準不準：Qwen3-4B 的類別 75%、日期 77% 正確，直接過濾會擋掉正確記憶。",
     "不加 person_id 過濾時，26%–55% 的題目第一名是別人的記憶；實際系統一定要依使用者過濾。",
     "總結用 LLM：Qwen3-4B-Instruct-2507 總結 390 場對話全部成功，覆蓋 98% 的事實；Nano 現有的 2B 以下模型寫不出可用的日文。",
-    "向量庫：ChromaDB（HNSW）的過濾與精確搜尋完全一致、只搜本人時不跨人；搭配使用者過濾時 Recall@10 是 1.000，選型結論不受近似搜尋影響。"
+    "向量庫：ChromaDB（HNSW）的過濾與精確搜尋完全一致、只搜本人時不跨人；搭配使用者過濾時 Recall@10 是 1.000，選型結論不受近似搜尋影響。",
+    "完整問答（ruri-v3-130m＋Qwen3-4B，測試集）：引用全部正確；無答案題 14/14 拒答；可回答題有回答 71%，其餘多半是時間題與全平假名的問題被閾值擋下；新舊衝突 4 題只答對 1 題。"
   ],
   "charts": [
     {
@@ -81,8 +82,8 @@
     "note": "準確度：測試集，只搜該使用者的記憶，精確搜尋；LLM 記憶庫有答案 106 題、標準事實 108 題，經池化審查補判；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "選型報告（docs/analysis/selection_report.md）與 ADR 0001（提議中）已完成，請審閱。",
-    "5.1.6–5.1.7：完整流程（含 LLM 判斷第二層、日期過濾的用法、新舊記憶並存時的回答）與各階段量測，在實際流程中確認主選模型。"
+    "5.1.7：各階段延遲與記憶體量測（含 Top-k 3／5、大量資料時的過濾成本，範圍待確認）。",
+    "閾值擋掉約 3 成可回答題、新舊衝突在測試集只答對 1/4：增加無答案題後重新評估閾值，並考慮寫入時標記被取代的記憶。"
   ],
   "tasks": [
     { "id": "5.1.1", "name": "Candidate Embedding Model Survey", "progress": "調查完成" },
@@ -90,9 +91,9 @@
     { "id": "5.1.3", "name": "Memory Schema, Query Set & Ground Truth", "progress": "完成：201 題測試問題與標準答案，κ 0.90" },
     { "id": "5.1.4", "name": "Dummy Log & Summarization Pipeline", "progress": "完成：390 場對話、641 筆記憶（Qwen3-4B），覆蓋 98%" },
     { "id": "5.1.5", "name": "Vector DB & Filtered Retrieval", "progress": "完成：ChromaDB 過濾與精確搜尋一致、不跨人，HNSW Recall@10 ≥ 0.996" },
-    { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "尚未開始" },
+    { "id": "5.1.6", "name": "Full RAG Pipeline Integration", "progress": "完成：完整問答引用全部正確，無答案題 100% 拒答，約 3 成可回答題被閾值擋下（gate＋0.849）" },
     { "id": "5.1.7", "name": "Pipeline Profiling", "progress": "尚未開始" },
     { "id": "5.1.8", "name": "Embedding Model Metric Test", "progress": "完成（精確搜尋）：開發集、閾值校準、測試集；HNSW 與 ranx 交叉驗證未做" },
-    { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "完成（初步）：選型報告與 ADR 0001 提議主選 ruri-v3-130m、備選 ruri-v3-30m；待 5.1.5–5.1.7 確認後採用" }
+    { "id": "5.1.9", "name": "Result Analysis & Model Selection", "progress": "完成：ADR 0001 已採用（2026-11-08），主選 ruri-v3-130m、備選 ruri-v3-30m；5.1.6–5.1.7 的確認結果補在 ADR" }
   ]
 }

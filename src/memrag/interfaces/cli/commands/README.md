@@ -14,4 +14,6 @@
 | `dataset.py` | 檔案 | `memrag dataset validate`、`show-query`、`split`、`sample`、`agreement`：檢查與查看標準答案 | 手動維護 | 是 |
 | `corpus.py` | 檔案 | `memrag dialogues validate`、`memrag summarize`、`memrag corpus build`：檢查對話、總結一場對話（`--show-retries` 看每次嘗試）、總結全部對話並凍結語料 | 手動維護 | 是 |
 | `store.py` | 檔案 | `memrag store build`（把記憶庫寫進 `results/vector_db/`）、`store check`（ChromaDB 對精確搜尋）、`memrag search`（依使用者、類別、日期過濾搜尋記憶） | 手動維護 | 是 |
-| `evaluate.py` | 檔案 | `memrag eval run`（檢索準確度，`--corpus gold` 或 `memories`）、`eval rescore`（沿用向量重算）、`eval calibrate`／`eval thresholds`（閾值與小候選集），以及 `memrag select`（依選型規則排名） | 手動維護 | 是 |
+| `ask.py` | 檔案 | `memrag ask`（完整問答，`--trace` 列出檢索結果、閾值、Context、耗時與設定；`--threshold-mode per_memory|gate` 選閾值做法）、`memrag ingest`（總結對話並寫入向量庫，產生結果資料夾） | 手動維護 | 是 |
+| `ui.py` | 檔案 | `memrag ui`：啟動手動測試 UI（`--fake` 不需要模型）；沒安裝 Gradio 時提示 `uv sync --extra ui` | 手動維護 | 是 |
+| `evaluate.py` | 檔案 | `memrag eval run`（檢索準確度，`--corpus gold` 或 `memories`）、`eval rescore`（沿用向量重算）、`eval calibrate`／`eval thresholds`（閾值與小候選集）、`eval answers`（每題完整問答，三種做法：逐筆閾值、閾值當閘門、不用閾值；檢查拒答、引用與新舊記憶），以及 `memrag select`（依選型規則排名） | 手動維護 | 是 |

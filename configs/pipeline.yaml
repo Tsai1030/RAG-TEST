@@ -8,7 +8,7 @@ llm:
   revision: a06e946bb6b655725eafa393f4a9745d460374c9
   file: Qwen3-4B-Instruct-2507-Q4_K_M.gguf
   license: apache-2.0
-  context: 8192
+  context: 8192  # for summarizing; answer sessions start the server with LLM_CTX=4096 (Nano memory)
   temperature: 0.0
   seed: 42
   max_tokens: 2048
@@ -16,5 +16,25 @@ llm:
 summarize:
   prompt_version: v1
   cache_dir: results/llm_cache
+
+retrieval:
+  top_k: 5
+  # Decided 2026-11-08 on the dev set (5.1.6): the summarizer's categories are 75% correct and
+  # 78% of memories have no event date, so the pipeline filters by date with the
+  # conversation-date fallback and never by category.
+  date_fallback: true
+  category_filter: false
+
+answer:
+  prompt_version: v1
+  # Characters of context lines; Qwen3 needs about one token per Japanese character or fewer,
+  # so prompt + answer stay inside a 4096-token context. Top-5 memories never exceed it.
+  context_budget_chars: 1200
+  use_threshold: true  # configs/thresholds.yaml; a model without a threshold runs uncalibrated
+  # per_memory: only memories at or above the threshold reach the LLM.
+  # gate: the threshold only decides whether to call the LLM (top-1 passes), then all top-k go.
+  # Chosen on the dev set (run 20261109-095811_answer_eval): gate matched or beat per_memory on
+  # every measure and cited the newer memory on all 4 update queries (per_memory: 3).
+  threshold_mode: gate
 
 refusal_text: 関連する情報はありません

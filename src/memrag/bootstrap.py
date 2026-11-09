@@ -83,13 +83,26 @@ def response_cache(cfg: dict, root: Path | None = None):
     return FileResponseCache((root or project_root()) / cfg["summarize"]["cache_dir"])
 
 
-def vector_store(model: str, dim: int, root: Path | None = None):
-    """The persistent ChromaDB store of one model under results/vector_db/."""
+def vector_store(model: str, dim: int, root: Path | None = None, fake: bool = False, path: Path | None = None):
+    """The persistent ChromaDB store of one model under results/vector_db/ (or `path`).
+
+    Fake vectors go to an in-process store, so they can never overwrite a real index.
+    """
     from memrag.infrastructure.vectorstore.chroma_store import ChromaStore
 
-    path = (root or project_root()) / VECTOR_DB
+    if fake and path is None:
+        return ChromaStore(model, dim)
+    path = path or (root or project_root()) / VECTOR_DB
     path.mkdir(parents=True, exist_ok=True)
     return ChromaStore(model, dim, path)
+
+
+def thresholds(root: Path | None = None) -> dict:
+    """configs/thresholds.yaml, or {} before calibration."""
+    import yaml
+
+    path = (root or project_root()) / THRESHOLDS_CONFIG
+    return yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
 
 def resolve_device(device: str) -> str:

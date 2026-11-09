@@ -75,6 +75,28 @@
 - **Windows 上 `store check` 結束後刪不掉暫存資料夾：** ChromaDB 在 Windows 會延後釋放檔案，程式已忽略這個錯誤，暫存資料夾可以手動刪除。
 - **想清空向量庫：** 刪除 `results/vector_db/` 後重新 `store build`。
 
+## 5.1.6 完整問答流程
+
+第 1–4 項 Windows 上就能做（假模型、假 LLM）；第 5–8 項在 Nano 上，要用 `scripts/nano_llm_session.sh` 暫停常駐服務並啟動 LLM。
+
+| # | 指令 | 預期結果 | 實際結果 |
+|---|---|---|---|
+| 1 | `uv run memrag ask "ラーメン" --person p06 --fake --trace` | 「関連する情報はありません」；判斷是「沒有記憶通過閾值，未呼叫 LLM（第一層）」；過濾顯示 `date_fallback: True`；檢索結果都是 p06 | |
+| 2 | 同上，加 `--no-threshold` | 回答第一筆記憶的內容並引用它（假 LLM 的行為）；閾值顯示「未校準，不套用」 | |
+| 3 | `uv run memrag eval answers --fake --limit 10` | 三種做法各一列（`threshold+llm` 逐筆閾值、`gate+llm` 閾值當閘門、`llm_only` 不用閾值）；「無效引用」與「過濾外」都是 0；「重跑檢索」結果不同 0 題 | |
+| 4 | `uv run memrag ui --fake`，瀏覽器開 `http://127.0.0.1:7860` | 六個分頁都能操作；Ask 分頁顯示回答、判斷、檢索結果表與 Trace | |
+| 5 | Nano 上：`LLM_CTX=4096 nohup bash scripts/nano_llm_session.sh "uv run memrag store build --model ruri-v3-130m" "uv run memrag ask 'とんこつラーメン、今もよく食べてるんだっけ？' --person p06 --today 2026-11-01 --trace --device cpu" > /tmp/rag_llm.log 2>&1 &` | 回答根據 10/24 的新記憶（月に二回まで），引用的 memory_id 都在 Context 裡；服務重啟 | |
+| 6 | 同上，問題換成 `'釣りに行く予定ってあったっけ。' --person p02` | 拒答（閾值擋下或 LLM 拒答），沒有引用 | |
+| 7 | 同上，問題換成 `'明日の天気はどうなるかな？' --person p06` | 拒答，不呼叫 LLM（第一層） | |
+| 8 | Nano 上：`bash scripts/nano_services.sh status` | 兩個服務都是 `running` | |
+
+**常見問題**
+
+- **Nano 卡住、ssh 連不上：** 多半是記憶體用完。問答時加 `LLM_CTX=4096` 與 `--device cpu`；`nano_llm_session.sh` 在可用記憶體低於 500 MiB 時會自動停止並重啟服務。
+- **ask 顯示 `stage answer` 的錯誤：** LLM 伺服器沒有啟動，`memrag ask` 只能在 `nano_llm_session.sh` 裡執行（或自行啟動 :8095）。
+- **說沒有索引：** 先 `memrag store build --model <模型>`；5.1.6 起向量庫存了完整記錄，舊的索引要重建一次。
+- **類別過濾沒有作用：** `ask` 依 5.1.6 的決定不使用類別過濾，日期過濾在記憶沒有事件日期時改看記錄日；`search` 則照輸入的條件過濾。
+
 ## 5.1.8 檢索準確度（預評估）
 
 目前把 Gold Facts 當記憶庫。第 1 項 Windows 上就能做；第 2 項要在 Nano 上跑，Qwen3 用 float32 約需 3 GiB，要先停止常駐服務。

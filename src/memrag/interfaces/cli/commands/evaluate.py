@@ -1,4 +1,4 @@
-"""memrag eval run | rescore"""
+"""memrag eval run | rescore | calibrate | thresholds | answers, memrag select"""
 
 from __future__ import annotations
 
@@ -40,6 +40,36 @@ def register(sub) -> None:
     t.add_argument("--note", default="")
     t.add_argument("--json", action="store_true")
     t.set_defaults(handler=run_thresholds)
+
+    a = p.add_parser("answers", help="每題都跑完整問答，檢查拒答與引用（計畫 5.1.6；Nano 上要先啟動 LLM）")
+    a.add_argument("--model", default="ruri-v3-130m")
+    a.add_argument("--split", default="all", choices=["dev", "test", "all"])
+    a.add_argument("--limit", type=int, help="只跑前 N 題，用來試跑")
+    a.add_argument("--device", default="auto")
+    a.add_argument("--fake", action="store_true")
+    a.add_argument("--note", default="")
+    a.add_argument("--json", action="store_true")
+    a.set_defaults(handler=run_answers)
+
+
+def run_answers(args) -> int:
+    from memrag.interfaces.cli.main import print_json
+
+    out = memrag.evaluate_answers(args.model, None if args.split == "all" else args.split, args.limit,
+                                  device=args.device, fake=args.fake, note=args.note)
+    if args.json:
+        print_json(out)
+        return 0
+    print(f"結果資料夾：{out['run_dir']}")
+    print(f"  {'做法':<16}{'有答案→回答':>12}{'引用相關':>9}{'無答案→拒答':>12}{'部分相關→回答':>14}{'無效引用':>9}{'過濾外':>7}{'更新題引用新':>12}")
+    for variant, m in out["variants"].items():
+        u = m["updates"]
+        print(f"  {variant:<16}{_fmt(m['answerable']['answered']):>12}{_fmt(m['answerable']['cited_relevant']):>9}"
+              f"{_fmt(m['no_answer']['refused']):>12}{_fmt(m['partial']['answered']):>14}"
+              f"{m['citations']['invalid']:>9}{m['citations']['outside_filter']:>7}{u['cited_new']:>8}/{u['answered']}")
+    r = out["retrieval_repeat"]
+    print(f"重跑檢索：{r['queries']} 題，結果不同 {len(r['different'])} 題")
+    return 0
 
 
 def register_select(sub) -> None:
@@ -85,7 +115,7 @@ def run_thresholds(args) -> int:
 
 
 def _fmt(rate: dict | None) -> str:
-    return "     —" if rate is None else f"{rate['rate']:6.3f}"
+    return "     —" if rate is None or "rate" not in rate else f"{rate['rate']:6.3f}"
 
 
 def _print_thresholds(out: dict, as_json: bool) -> int:
