@@ -752,9 +752,54 @@ Query + prefix → Embedding → person_id／日期過濾 → cosine 排序取 T
 - 雲端 LLM 的延遲另外標示，不與本地運算混算
 - 量不到的欄位記為 `N/A`（不是 0）
 
+**檢索階段與向量庫規模測試（2026-11-09 新增，草案）**
+
+目的：量「問題 → 取得 Top-k 記憶」這段的速度與資源，比較 Top-k 3 與 5，並確認資料量變大、過濾條件變多時，ChromaDB 是否仍是合適的選擇。目前的檢索就是依 cosine 相似度（向量已正規化，等於內積）取最高的 K 筆，用 HNSW 近似搜尋；沒有 MMR、Reranker 或 BM25。
+
+*實驗 A：檢索階段（現有資料：641 筆記憶、201 題）*
+
+| 變因 | 值 |
+|---|---|
+| Top-k | 3、5 |
+| Embedding 裝置 | CPU、GPU（兩個都量） |
+| 向量庫 | ChromaDB（HNSW）、精確搜尋（`ExactStore`，逐筆計算） |
+
+- **分段計時：** 問題加 prefix 與 Embedding、metadata 過濾＋搜尋、取回完整記憶；另外記錄冷啟動（第一題，含模型載入）
+- **指標：**
+
+| 指標 | 量法 |
+|---|---|
+| Query Latency | 各段與總計的 P50／P95／P99 |
+| QPS | 依序連續送題的每秒題數；機器人一次服務一人，以延遲為主 |
+| Peak RAM | 行程峰值 RSS、系統 `MemAvailable` 下降量；GPU 時加記 `torch.cuda` 配置峰值 |
+| Index Size | 向量庫資料夾的磁碟大小、載入後的記憶體增量 |
+| Build Time | Document Embedding 與寫入索引分開計時 |
+| Recall@K | 品質：正確記憶（2 分）是否在前 K 名，用現有標註；近似誤差：HNSW 前 K 名與精確搜尋的重疊率 |
+
+- **預期：** Top-k 3 與 5 的檢索時間差距很小（時間主要花在問題 Embedding），Top-k 主要影響 Recall 與送給 LLM 的 Context 長度；Context 長度與 LLM 讀 prompt 的時間一併記錄
+
+*實驗 B：資料量與 metadata 過濾的成本（擴充資料）*
+
+- **資料：** 把 641 筆記憶複製擴充成 **1k、10k、50k** 筆，分配給不同的虛擬使用者並平移日期；向量加入微小雜訊後重新正規化，避免完全相同的向量影響 HNSW。速度與記憶體不需要新的標註；擴充資料上的 Recall 只量 HNSW 對精確搜尋的重疊率
+- **每人筆數：** 依「每人約 100／1,000／5,000 筆」安排（5,000 筆約等於一人每天 5 筆、用 3 年）
+- **過濾條件（依篩選後剩下的比例設計）：** 不過濾、只看使用者、使用者＋日期範圍（一週／一個月）、使用者＋日期 fallback（`$or`，現行做法）、類別、多值條件（`$in`，多個類別或人物）
+- **量什麼：** 每種資料量 × 過濾條件 × 向量庫的延遲（P50／P95）、峰值記憶體、索引大小、建置時間、HNSW 對精確搜尋的 Recall@K
+- **Metadata 欄位的取捨：** 效能只看每種過濾條件要付出的時間與記憶體；某個欄位對回答有沒有幫助，只能在有標註的現有資料上評估（例如 5.1.6 的類別過濾反而變差）。候選欄位：`person_id`、`event_date`、`conversation_date`（現有）、`people`（已存但未用來過濾）、被取代標記、敏感度
+
+*向量庫的比較順序*
+
+1. 先比 ChromaDB 與精確搜尋。精確搜尋在 5 萬筆、512 維時約 100 MB，若在最大資料量下 P95 仍明顯低於問題 Embedding 的時間，代表可以不需要 HNSW
+2. 兩者都有明顯問題時，再加入 sqlite-vec、LanceDB 或 FAISS＋SQLite 比較；Qdrant 需要另外跑伺服器，Nano 記憶體吃緊，列最後
+
+*執行方式（暫定）*
+
+- `memrag profile retrieval`（實驗 A）與 `memrag profile scale`（實驗 B），設定放 `configs/experiments/`，結果寫入 `results/runs/<run_id>_profile_*`
+- 在 Nano 用 `nano_measure.sh` 執行（暫停常駐服務、結束後一定重啟）；不載入 LLM。實際部署時 LLM 與 Embedding 同時在 Nano 上，「LLM 已載入時的 GPU Embedding」另外量一組
+- 工時：預估比原本的 5.1.7 多約 1 人天（待確認）
+
 **適用範圍（D2）：** 正式部署在自架伺服器，Nano 上的數字只用來比較模型之間的相對差異與找出瓶頸階段。部署伺服器確定後，用同一套 `memrag profile` 在伺服器上重跑，得到正式數字。
 
-**驗收：** 各階段耗時加總與端到端總耗時差距 < 5%；Profiler 開銷經量測並記錄；報告明確列出瓶頸階段。
+**驗收：** 各階段耗時加總與端到端總耗時差距 < 5%；Profiler 開銷經量測並記錄；報告明確列出瓶頸階段。檢索與規模測試：實驗 A、B 的每個組合都有數字或明確的 `N/A` 原因；HNSW 對精確搜尋的 Recall@K 有記錄；結論寫明是否繼續用 ChromaDB。
 
 **手動測試：** `memrag profile --config configs/experiments/smoke.yaml`，或 `memrag ask ... --trace`
 

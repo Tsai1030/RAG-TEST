@@ -1138,9 +1138,54 @@ ruri-v3-130m:
           <li>雲端 LLM 的延遲另外標示，不與本地運算混算</li>
           <li>量不到的欄位記為 <code>N/A</code>（不是 0）</li>
         </ul>
+        <h4>檢索階段與向量庫規模測試（2026-11-09 新增，草案）</h4>
+        <p>目的：量「問題 → 取得 Top-k 記憶」這段的速度與資源，比較 Top-k 3 與 5，並確認資料量變大、過濾條件變多時，ChromaDB 是否仍是合適的選擇。目前的檢索就是依 cosine 相似度（向量已正規化，等於內積）取最高的 K 筆，用 HNSW 近似搜尋；沒有 MMR、Reranker 或 BM25。</p>
+        <p><strong>實驗 A：檢索階段（現有資料：641 筆記憶、201 題）</strong></p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>變因</th><th>值</th></tr></thead>
+          <tbody>
+            <tr><td>Top-k</td><td>3、5</td></tr>
+            <tr><td>Embedding 裝置</td><td>CPU、GPU（兩個都量）</td></tr>
+            <tr><td>向量庫</td><td>ChromaDB（HNSW）、精確搜尋（<code>ExactStore</code>，逐筆計算）</td></tr>
+          </tbody>
+        </table></div>
+        <ul>
+          <li><strong>分段計時：</strong>問題加 prefix 與 Embedding、metadata 過濾＋搜尋、取回完整記憶；另外記錄冷啟動（第一題，含模型載入）</li>
+          <li><strong>預期：</strong>Top-k 3 與 5 的檢索時間差距很小（時間主要花在問題 Embedding），Top-k 主要影響 Recall 與送給 LLM 的 Context 長度；Context 長度與 LLM 讀 prompt 的時間一併記錄</li>
+        </ul>
+        <div class="table-wrap"><table>
+          <thead><tr><th>指標</th><th>量法</th></tr></thead>
+          <tbody>
+            <tr><td>Query Latency</td><td>各段與總計的 P50／P95／P99</td></tr>
+            <tr><td>QPS</td><td>依序連續送題的每秒題數；機器人一次服務一人，以延遲為主</td></tr>
+            <tr><td>Peak RAM</td><td>行程峰值 RSS、系統 <code>MemAvailable</code> 下降量；GPU 時加記 <code>torch.cuda</code> 配置峰值</td></tr>
+            <tr><td>Index Size</td><td>向量庫資料夾的磁碟大小、載入後的記憶體增量</td></tr>
+            <tr><td>Build Time</td><td>Document Embedding 與寫入索引分開計時</td></tr>
+            <tr><td>Recall@K</td><td>品質：正確記憶（2 分）是否在前 K 名，用現有標註；近似誤差：HNSW 前 K 名與精確搜尋的重疊率</td></tr>
+          </tbody>
+        </table></div>
+        <p><strong>實驗 B：資料量與 metadata 過濾的成本（擴充資料）</strong></p>
+        <ul>
+          <li><strong>資料：</strong>把 641 筆記憶複製擴充成 <strong>1k、10k、50k</strong> 筆，分配給不同的虛擬使用者並平移日期；向量加入微小雜訊後重新正規化，避免完全相同的向量影響 HNSW。速度與記憶體不需要新的標註；擴充資料上的 Recall 只量 HNSW 對精確搜尋的重疊率</li>
+          <li><strong>每人筆數：</strong>依「每人約 100／1,000／5,000 筆」安排（5,000 筆約等於一人每天 5 筆、用 3 年）</li>
+          <li><strong>過濾條件（依篩選後剩下的比例設計）：</strong>不過濾、只看使用者、使用者＋日期範圍（一週／一個月）、使用者＋日期 fallback（<code>$or</code>，現行做法）、類別、多值條件（<code>$in</code>，多個類別或人物）</li>
+          <li><strong>量什麼：</strong>每種資料量 × 過濾條件 × 向量庫的延遲（P50／P95）、峰值記憶體、索引大小、建置時間、HNSW 對精確搜尋的 Recall@K</li>
+          <li><strong>Metadata 欄位的取捨：</strong>效能只看每種過濾條件要付出的時間與記憶體；某個欄位對回答有沒有幫助，只能在有標註的現有資料上評估（例如 5.1.6 的類別過濾反而變差）。候選欄位：<code>person_id</code>、<code>event_date</code>、<code>conversation_date</code>（現有）、<code>people</code>（已存但未用來過濾）、被取代標記、敏感度</li>
+        </ul>
+        <p><strong>向量庫的比較順序</strong></p>
+        <ol class="steps">
+          <li>先比 ChromaDB 與精確搜尋。精確搜尋在 5 萬筆、512 維時約 100 MB，若在最大資料量下 P95 仍明顯低於問題 Embedding 的時間，代表可以不需要 HNSW</li>
+          <li>兩者都有明顯問題時，再加入 sqlite-vec、LanceDB 或 FAISS＋SQLite 比較；Qdrant 需要另外跑伺服器，Nano 記憶體吃緊，列最後</li>
+        </ol>
+        <p><strong>執行方式（暫定）</strong></p>
+        <ul>
+          <li><code>memrag profile retrieval</code>（實驗 A）與 <code>memrag profile scale</code>（實驗 B），設定放 <code>configs/experiments/</code>，結果寫入 <code>results/runs/&lt;run_id&gt;_profile_*</code></li>
+          <li>在 Nano 用 <code>nano_measure.sh</code> 執行（暫停常駐服務、結束後一定重啟）；不載入 LLM。實際部署時 LLM 與 Embedding 同時在 Nano 上，「LLM 已載入時的 GPU Embedding」另外量一組</li>
+          <li>工時：預估比原本的 5.1.7 多約 1 人天（待確認）</li>
+        </ul>
         <p><strong>適用範圍（D2）：</strong>正式部署在自架伺服器，Nano 上的數字只用來比較模型之間的相對差異與找出瓶頸階段。部署伺服器確定後，用同一套 <code>memrag profile</code> 在伺服器上重跑，得到正式數字。</p>
         <dl class="outcome">
-          <div><dt>驗收</dt><dd>各階段耗時加總與端到端總耗時差距 &lt; 5%；Profiler 開銷經量測並記錄；報告明確列出瓶頸階段。</dd></div>
+          <div><dt>驗收</dt><dd>各階段耗時加總與端到端總耗時差距 &lt; 5%；Profiler 開銷經量測並記錄；報告明確列出瓶頸階段。檢索與規模測試：實驗 A、B 的每個組合都有數字或明確的 <code>N/A</code> 原因；HNSW 對精確搜尋的 Recall@K 有記錄；結論寫明是否繼續用 ChromaDB。</dd></div>
           <div><dt>手動測試</dt><dd><code>memrag profile --config configs/experiments/smoke.yaml</code>，或 <code>memrag ask ... --trace</code></dd></div>
         </dl>
       </article>
@@ -1515,7 +1560,7 @@ def test_person_filter_never_leaks_other_person(): ...</code></pre>
     "note": "準確度：測試集，只搜該使用者的記憶，精確搜尋；LLM 記憶庫有答案 106 題、標準事實 108 題，經池化審查補判；信賴區間約 ±0.04。公開分數是 MTEB 7 個日文文件檢索資料集的 nDCG@10 平均，只用於篩選。效能是 Nano 上的單次量測（Qwen3 為 bfloat16），記憶體峰值含約 0.7 GiB 的 CUDA 固定開銷；正式數字要在部署伺服器重測。GLuCoSE-base-ja-v2 因與 transformers 5 不相容已移出。"
   },
   "next": [
-    "5.1.7：各階段延遲與記憶體量測（含 Top-k 3／5、大量資料時的過濾成本，範圍待確認）。",
+    "5.1.7：各階段延遲與記憶體量測；新增檢索階段（Top-k 3／5、CPU 與 GPU）與 1k／10k／50k 筆的過濾成本測試，先比 ChromaDB 與精確搜尋（計畫草案已寫入 5.1.7）。",
     "閾值擋掉約 3 成可回答題、新舊衝突在測試集只答對 1/4：增加無答案題後重新評估閾值，並考慮寫入時標記被取代的記憶。"
   ],
   "tasks": [
