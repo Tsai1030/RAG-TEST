@@ -21,12 +21,15 @@ class FakeLLMProvider:
     def __init__(self, responses: Sequence[str] | None = None):
         self._responses = list(responses) if responses is not None else None
         self.requests: list[list[ChatMessage]] = []
+        self.call_log: list[dict] | None = None  # same shape as llama_server.call_stats, without server timings
 
     def info(self) -> dict:
         return {"model": "fake", "temperature": 0.0, "seed": 0}
 
     def chat(self, messages: Sequence[ChatMessage], json_schema: dict) -> str:
         self.requests.append(list(messages))
+        if self.call_log is not None:
+            self.call_log.append({"wall_ms": 0.0, "retries": 0})
         if self._responses is not None:
             return self._responses.pop(0) if self._responses else '{"memories": []}'
         prompt = next(m["content"] for m in messages if m["role"] == "user")

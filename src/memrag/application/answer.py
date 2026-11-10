@@ -169,6 +169,7 @@ def ask(question: str, flt: MemoryFilter, today: date, embedder: EmbeddingProvid
             {"role": "user", "content": user}]
         key = cache_key(messages, llm, schema)
         cached = cache.get(key) if cache else None
+        lap("prompt")
         raw = cached if cached is not None else llm.chat(messages, schema)
         lap("llm")
         answer.raw_output, answer.cached = raw, cached is not None
@@ -184,6 +185,7 @@ def ask(question: str, flt: MemoryFilter, today: date, embedder: EmbeddingProvid
             answer.text = settings.refusal_text if answer.refused else output.answer.strip()
             answer.reason = "llm_refused" if answer.refused else "answered"
             answer.citations, answer.invalid_citations = valid, invalid
+        lap("parse")
     timings["total"] = round((time.perf_counter() - start) * 1000, 2)
     answer.timings_ms = timings
     return answer

@@ -1,4 +1,5 @@
-"""Plan 5.1.7: `memrag profile retrieval | scale` end to end with fake embeddings (child processes included)."""
+"""Plan 5.1.7: `memrag profile retrieval | scale | pipeline` end to end with fake embeddings and LLM
+(child processes included)."""
 
 import json
 import shutil
@@ -43,3 +44,29 @@ def test_profile_retrieval_and_scale_cli(tmp_path, monkeypatch, capsys):
     assert {p.name for p in Path(out["run_dir"]).iterdir()} == {"manifest.json", "metrics.json", "raw.jsonl"}
 
     assert main(["profile", "retrieval", "--fake", "--stores", "faiss"]) == 2
+
+
+def test_profile_pipeline_cli(tmp_path, monkeypatch, capsys):
+    _project(tmp_path, monkeypatch)
+    _frozen_corpus(tmp_path, capsys)
+    monkeypatch.setenv("RAG_LLM_LOAD_S", "12.5")
+
+    assert main(["profile", "pipeline", "--fake", "--logs", "3", "--split", "dev", "--overhead-rounds", "1",
+                 "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["load"]["llm_session"]["load_s"] == 12.5 and out["load"]["llm_session"]["ctx"] is None
+    ing = out["ingest"]
+    assert 0 < ing["logs"] <= 3 and ing["ok"] == ing["llm_calls"] == ing["logs"]  # fewer when the project has fewer logs
+    assert out["embedding_batches"] == []  # the fake embedder has no batch size
+    for k in ("3", "5"):
+        a = out["answers"][k]
+        assert a["queries"] == sum(a["reasons"].values()) > 0
+        assert a["llm"]["calls"] == a["reasons"].get("answered", 0) + a["reasons"].get("llm_refused", 0)
+        # The < 5% acceptance applies to real runs; fake stages take microseconds, so any wrapper cost dominates
+        assert 0 <= a["coverage_gap"]["mean"] <= a["coverage_gap"]["max"] < 1
+    assert out["memory"]["llm_server_rss_peak_mib"] is None
+    assert out["overhead"]["lap_us"] > 0 and out["overhead"]["sampler"]["off"]["n"] > 0
+    run = Path(out["run_dir"])
+    assert {p.name for p in run.iterdir()} == {"manifest.json", "metrics.json", "ingest.jsonl", "answers.jsonl"}
+    manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+    assert len(manifest["logs"]) == ing["logs"] and manifest["response_cache"] is False

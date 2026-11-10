@@ -97,7 +97,7 @@ def test_answer_with_citations_inside_the_filter():
     assert [h["passed"] for h in a.retrieved] == [True, True, False]
     prompt = llm.requests[0][1]["content"]
     assert prompt.startswith("2026-11-01") and TRIP.memory_id not in prompt
-    assert set(a.timings_ms) == {"embed_query", "retrieve", "context", "llm", "total"}
+    assert set(a.timings_ms) == {"embed_query", "retrieve", "context", "prompt", "llm", "parse", "total"}
 
 
 def test_no_memory_above_threshold_refuses_without_the_llm():

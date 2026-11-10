@@ -41,6 +41,20 @@ def mib(n: float) -> float:
     return round(n / 2**20, 1)
 
 
+def cuda_peak(reset: bool = False) -> int | None:
+    """PyTorch's peak CUDA allocation in bytes since the last reset; None when CUDA is not in use."""
+    try:
+        import torch
+    except ImportError:
+        return None
+    if not (torch.cuda.is_available() and torch.cuda.is_initialized()):
+        return None
+    peak = torch.cuda.max_memory_allocated()
+    if reset:
+        torch.cuda.reset_peak_memory_stats()
+    return peak
+
+
 def peak_rss() -> int:
     """Peak resident set size of this process in bytes (peak working set on Windows)."""
     try:

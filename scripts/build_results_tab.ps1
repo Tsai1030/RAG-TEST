@@ -1,4 +1,5 @@
-# Embeds reports/overview.json and reports/records/*.json into the results tab of docs/project_plan.html.
+# Embeds reports/overview.json, reports/selection_summary.json and reports/records/*.json into the
+# results tab of docs/project_plan.html.
 # Temporary until `memrag report build` exists.
 $ErrorActionPreference = "Stop"
 
@@ -8,6 +9,8 @@ $page = Join-Path $root "docs\project_plan.html"
 
 $overview = [IO.File]::ReadAllText((Join-Path $root "reports\overview.json"), $utf8)
 $null = $overview | ConvertFrom-Json
+$summary = [IO.File]::ReadAllText((Join-Path $root "reports\selection_summary.json"), $utf8)
+$null = $summary | ConvertFrom-Json
 
 $items = @()
 foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root "reports\records") -Filter "*.json" | Sort-Object Name) {
@@ -15,7 +18,7 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root "reports\records")
     $null = $text | ConvertFrom-Json
     $items += '{"id":"' + $file.BaseName + '","record":' + $text + '}'
 }
-$json = ('{"overview":' + $overview + ',"records":[' + ($items -join ',') + ']}').Replace('</', '<\/')
+$json = ('{"overview":' + $overview + ',"summary":' + $summary + ',"records":[' + ($items -join ',') + ']}').Replace('</', '<\/')
 
 $html = [IO.File]::ReadAllText($page, $utf8)
 $open = '<script id="report-data" type="application/json">'

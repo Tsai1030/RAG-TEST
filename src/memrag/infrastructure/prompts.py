@@ -11,10 +11,18 @@ from memrag.domain.schemas.prompt import PromptTemplate
 
 
 class YamlPromptStore:
+    """Each file is parsed once per store (about 3 ms a prompt, paid on every question before 5.1.7)."""
+
     def __init__(self, folder: Path):
         self._folder = folder
+        self._loaded: dict[tuple[str, str], PromptTemplate] = {}
 
     def get(self, name: str, version: str) -> PromptTemplate:
+        if (name, version) not in self._loaded:
+            self._loaded[name, version] = self._read(name, version)
+        return self._loaded[name, version]
+
+    def _read(self, name: str, version: str) -> PromptTemplate:
         path = self._folder / f"{name}.{version}.yaml"
         if not path.is_file():
             raise ConfigError(f"prompt not found: {path}")

@@ -12,8 +12,8 @@
 | `nano_fetch.ps1` | 檔案 | 把 Nano 的 `results/runs/<run_id>/` 取回 Windows | 手動維護 | 是 |
 | `nano_services.sh` | 檔案 | 在 Nano 上執行：量測前停止、量測後重啟 `llama-server` 與 `pocket_tts_server`（D8） | 手動維護 | 是 |
 | `nano_measure.sh` | 檔案 | 在 Nano 上執行一次量測：停服務、依序跑指令、結束時一定重啟服務；用 `nohup` 背景執行，SSH 斷線也不影響 | 手動維護 | 是 |
-| `nano_llm_session.sh` | 檔案 | 在 Nano 上執行一次總結：停服務、用 `configs/pipeline.yaml` 的模型啟動自己的 `llama-server`（:8095）、依序跑指令、結束時一定關掉它並重啟服務 | 手動維護 | 是 |
-| `build_results_tab.ps1` | 檔案 | 把 `reports/` 的紀錄寫入計畫書網頁的「測試結果」分頁，`memrag report build` 完成後移除 | 手動維護 | 是 |
+| `nano_llm_session.sh` | 檔案 | 在 Nano 上執行一次總結：停服務、用 `configs/pipeline.yaml` 的模型啟動自己的 `llama-server`（:8095）、依序跑指令、結束時一定關掉它並重啟服務；把 LLM 載入時間與載入前後的可用記憶體以 `RAG_LLM_*` 環境變數傳給指令（`memrag profile pipeline` 使用） | 手動維護 | 是 |
+| `build_results_tab.ps1` | 檔案 | 把 `reports/` 的總覽、選型總結與紀錄寫入計畫書網頁的「測試結果」分頁，`memrag report build` 完成後移除 | 手動維護 | 是 |
 
 ## nano_sync.ps1
 

@@ -36,6 +36,9 @@ class MemRAG:
         self._store_dir = store_dir
         self._use_cache = use_cache and not fake
         self._store = self._llm = None
+        # Read once: re-reading thresholds.yaml and the prompt YAML cost ~7 ms per question (5.1.7)
+        self._prompts = bootstrap.prompt_store()
+        self._thresholds: dict | None = None
 
     @classmethod
     def from_config(cls, embedding_model: str, device: str = "auto", fake: bool = False,
@@ -75,7 +78,9 @@ class MemRAG:
         """configs/thresholds.yaml for this model; None when uncalibrated or switched off."""
         if not self._cfg["answer"]["use_threshold"]:
             return None
-        return bootstrap.thresholds().get("thresholds", {}).get(self.embedding_model.name)
+        if self._thresholds is None:
+            self._thresholds = bootstrap.thresholds()
+        return self._thresholds.get("thresholds", {}).get(self.embedding_model.name)
 
     def _cache(self):
         return bootstrap.response_cache(self._cfg) if self._use_cache else None
@@ -101,7 +106,7 @@ class MemRAG:
         if user_name is None:
             user_name = _user_handles(load_gold_set()).get(log.person_id, "ユーザーさん")
         try:
-            return ingest_log(log, user_name, self._embedder, self.store, self.llm, bootstrap.prompt_store(),
+            return ingest_log(log, user_name, self._embedder, self.store, self.llm, self._prompts,
                               self._cache(), self._cfg["summarize"]["prompt_version"])
         except LLMUnavailableError as e:
             raise PipelineError("summarize", log.log_id, str(e)) from e
@@ -122,10 +127,10 @@ class MemRAG:
                                       **({} if r["category_filter"] else {"category": None})})
 
     def ask(self, question: str, filters: MemoryFilter | None = None, today: date | None = None,
-            use_threshold: bool = True, threshold_mode: str | None = None) -> Answer:
+            use_threshold: bool = True, threshold_mode: str | None = None, top_k: int | None = None) -> Answer:
         """Answer from the memories with cited memory_ids, the trace and per-stage timings.
 
-        `threshold_mode` (per_memory | gate) defaults to pipeline.yaml's answer.threshold_mode.
+        `threshold_mode` (per_memory | gate) and `top_k` default to pipeline.yaml.
         """
         from datetime import date as date_cls
 
@@ -133,20 +138,20 @@ class MemRAG:
         from memrag.domain.errors import LLMUnavailableError, PipelineError
 
         a = self._cfg["answer"]
-        settings = AskSettings(self._cfg["retrieval"]["top_k"], self.threshold if use_threshold else None,
+        settings = AskSettings(top_k or self._cfg["retrieval"]["top_k"],self.threshold if use_threshold else None,
                                a["context_budget_chars"], self._cfg["refusal_text"], a["prompt_version"],
                                threshold_mode or a["threshold_mode"])
         try:
             return ask(question, self.pipeline_filter(filters), today or date_cls.today(), self._embedder,
-                       self.store, self.llm, bootstrap.prompt_store(), settings, self._cache())
+                       self.store, self.llm, self._prompts, settings, self._cache())
         except LLMUnavailableError as e:
             raise PipelineError("answer", repr(question), str(e)) from e
 
     def manifest(self) -> dict:
         """What identifies a pipeline run: model, threshold, prompts, settings, LLM."""
         spec = self.embedding_model
-        prompts = bootstrap.prompt_store()
-        th = bootstrap.thresholds()
+        prompts = self._prompts
+        th = self._thresholds if self._thresholds is not None else bootstrap.thresholds()
         return {
             "embedding_model": {"name": spec.name, "hf_id": spec.hf_id, "revision": spec.revision, "dim": spec.dim,
                                 "query_prefix": spec.query_prefix, "document_prefix": spec.document_prefix},
@@ -1145,6 +1150,166 @@ def profile_retrieval(model: str, devices: Sequence[str] = ("cpu", "cuda"), stor
     manifest["finished"] = datetime.now().isoformat(timespec="seconds")
     write_json(run_dir / "manifest.json", manifest)
     return {"run_dir": str(run_dir), "rows": rows}
+
+
+PROFILE_BATCH_SIZES = (1, 8, 32, 64)
+LLM_SESSION_VARS = ("load_s", "mem_before_mib", "mem_after_mib", "ctx")  # RAG_LLM_* from nano_llm_session.sh
+
+
+def profile_pipeline(model: str, device: str = "cuda", logs: int = 20, ks: Sequence[int] = (3, 5),
+                     split: str | None = None, batch_sizes: Sequence[int] = PROFILE_BATCH_SIZES, warmup: int = 3,
+                     overhead_rounds: int = 2, fake: bool = False, note: str = "") -> dict:
+    """Plan 5.1.7 full pipeline with the LLM loaded, response cache off.
+
+    1. Ingest a seeded sample of dialogue logs (summarize → embed → store) into a scratch store
+    2. Document embedding of the frozen memories per batch size, then index them
+    3. Every query through `ask` per Top-k, with llama-server's prefill/decode timings
+    4. Profiler cost: one stage lap, and the memory sampler thread on retrieval passes
+    Run inside scripts/nano_llm_session.sh: its RAG_LLM_* variables give the LLM's load time
+    and memory. Writes ingest.jsonl, answers.jsonl, metrics.json and manifest.json.
+    """
+    import os
+    import random
+    import shutil
+    import time
+
+    from memrag.application.evaluation.pipeline_profile import (
+        answer_summary,
+        ingest_summary,
+        lap_overhead_us,
+        sampler_overhead,
+    )
+    from memrag.domain.schemas.retrieval import MemoryFilter
+    from memrag.infrastructure.memory_sampler import MemSampler, cuda_peak, mib, peak_rss
+    from memrag.infrastructure.storage.manifest import append_jsonl, environment_info, new_run_dir, write_json
+
+    root = bootstrap.project_root()
+    cfg = bootstrap.pipeline_config()
+    data, corpus_info = _retrieval_input("memories", split)
+    memories = load_memories()
+    dialogues = sorted(load_dialogues(), key=lambda d: d.log_id)
+    sample = sorted(random.Random(0).sample(dialogues, min(logs, len(dialogues))), key=lambda d: d.log_id)
+    handles = _user_handles(load_gold_set())
+
+    def flt(q) -> MemoryFilter:
+        return MemoryFilter(person_id=q.person_id, category=q.filters.category, date_from=q.filters.date_from,
+                            date_to=q.filters.date_to)
+
+    def server_rss(llm) -> int | None:
+        return llm.server_rss() if hasattr(llm, "server_rss") else None
+
+    run_dir = new_run_dir(root, "profile_pipeline" + ("_fake" if fake else ""))
+    work = run_dir / "work"
+    sampler = MemSampler()
+    sampler.start()
+    t = time.perf_counter()
+    embedder = bootstrap.embedding_provider(bootstrap.registry(root), model, device=device, fake=fake)
+    load = {"embedding_load_s": round(time.perf_counter() - t, 2), "embedding_mem_mib": mib(sampler.used_now()),
+            "llm_session": {k: (float(v) if (v := os.environ.get(f"RAG_LLM_{k.upper()}")) else None)
+                            for k in LLM_SESSION_VARS}}
+    ingest_rag = MemRAG(embedder, cfg, fake, work / "ingest", use_cache=False)
+    rag = MemRAG(embedder, cfg, fake, work / "answer", use_cache=False)
+    manifest = {"run_id": run_dir.name, "kind": "profile_pipeline", "started": datetime.now().isoformat(timespec="seconds"),
+                "note": note, "device": device, "logs": [d.log_id for d in sample], "ks": list(ks),
+                "batch_sizes": list(batch_sizes), "warmup": warmup, "overhead_rounds": overhead_rounds,
+                "queries": len(data.queries), "memories": len(memories), **corpus_info, "response_cache": False,
+                **rag.manifest(), "served_model": None if fake else rag.llm.served_model(),
+                "environment": environment_info(root)}
+    write_json(run_dir / "manifest.json", manifest)
+    server_peak = 0
+
+    # 1. ingest
+    calls: list[dict] = []
+    ingest_rag.llm.call_log = calls
+    ingest_rows = []
+    for log in sample:
+        n = len(calls)
+        t = time.perf_counter()
+        report = ingest_rag.ingest_log(log, handles.get(log.person_id, "ユーザーさん"))
+        row = {"log_id": log.log_id, "turns": len(log.turns), "ok": report.ok, "accepted": report.accepted,
+               "retries": report.retries, "timings_ms": report.timings_ms,
+               "wall_ms": round((time.perf_counter() - t) * 1000, 2), "llm_calls": calls[n:],
+               "sys_mem_mib": mib(sampler.used_now())}
+        server_peak = max(server_peak, server_rss(ingest_rag.llm) or 0)
+        append_jsonl(run_dir / "ingest.jsonl", row)
+        ingest_rows.append(row)
+    ingest_rag.close()
+
+    # 2. document embedding per batch size, then the index
+    texts = [m.content for m in memories]
+    batches = []
+    if hasattr(embedder, "batch_size"):
+        default = embedder.batch_size
+        embedder.embed_documents(texts[:64])  # warm-up
+        for b in batch_sizes:
+            embedder.batch_size = b
+            cuda_peak(reset=True)
+            t = time.perf_counter()
+            embedder.embed_documents(texts)
+            s = time.perf_counter() - t
+            peak = cuda_peak()
+            batches.append({"batch_size": b, "seconds": round(s, 3), "docs_per_s": round(len(texts) / s, 1),
+                            "cuda_peak_mib": mib(peak) if peak is not None else None,
+                            "sys_mem_mib": mib(sampler.used_now())})
+        embedder.batch_size = default
+    t = time.perf_counter()
+    rag.index(memories)
+    index = {"memories": len(memories), "seconds": round(time.perf_counter() - t, 3)}
+
+    # 3. answers, one Top-k after the other (consecutive prompts share the server's prefix cache as in use)
+    calls = []
+    rag.llm.call_log = calls
+    answer_rows = []
+    for k in ks:
+        for i, q in enumerate(data.queries):
+            n = len(calls)
+            t = time.perf_counter()
+            a = rag.ask(q.text, flt(q), q.asked_on, top_k=k)
+            row = {"query_id": q.query_id, "k": k, "warmup": i < warmup, "reason": a.reason,
+                   "context_memories": len(a.context), "context_chars": sum(len(line) + 1 for line in a.context),
+                   "timings_ms": a.timings_ms, "wall_ms": round((time.perf_counter() - t) * 1000, 2),
+                   "llm": calls[n] if len(calls) > n else None, "sys_mem_mib": mib(sampler.used_now())}
+            server_peak = max(server_peak, server_rss(rag.llm) or 0)
+            append_jsonl(run_dir / "answers.jsonl", row)
+            answer_rows.append(row)
+    sys_peak = sampler.stop()
+    total_cuda = cuda_peak()
+
+    # 4. profiler cost: alternate passes without and with a sampler thread
+    def retrieval_pass() -> list[float]:
+        out = []
+        for q in data.queries:
+            t = time.perf_counter()
+            rag.search(q.text, rag.pipeline_filter(flt(q)), max(ks))
+            out.append((time.perf_counter() - t) * 1000)
+        return out
+
+    retrieval_pass()  # warm-up
+    on, off = [], []
+    for _ in range(overhead_rounds):
+        off += retrieval_pass()
+        s = MemSampler()
+        s.start()
+        on += retrieval_pass()
+        s.stop()
+    rag.close()
+
+    metrics = {
+        "load": load,
+        "ingest": ingest_summary(ingest_rows),
+        "embedding_batches": batches,
+        "index": index,
+        "answers": {str(k): answer_summary([r for r in answer_rows if r["k"] == k and not r["warmup"]]) for k in ks},
+        "memory": {"sys_peak_mib": mib(sys_peak), "process_peak_rss_mib": mib(peak_rss()),
+                   "cuda_peak_mib": mib(total_cuda) if total_cuda is not None else None,
+                   "llm_server_rss_peak_mib": mib(server_peak) if server_peak else None},
+        "overhead": {"lap_us": lap_overhead_us(), "sampler": sampler_overhead(on, off)},
+    }
+    write_json(run_dir / "metrics.json", metrics)
+    shutil.rmtree(work, ignore_errors=True)
+    manifest["finished"] = datetime.now().isoformat(timespec="seconds")
+    write_json(run_dir / "manifest.json", manifest)
+    return {"run_dir": str(run_dir), **metrics}
 
 
 def profile_scale(model: str, sizes: Sequence[int] = (1000, 10000, 50000), stores: Sequence[str] = PROFILE_STORES,

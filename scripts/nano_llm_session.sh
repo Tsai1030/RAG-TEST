@@ -39,12 +39,17 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM   # make the EXIT trap run when the session is killed
 
 mkdir -p results/service_logs
+MEM_BEFORE=$(mem_mb)
+START=$(date +%s.%N)
 "$LLAMA_SERVER" -m "$MODEL" -ngl 99 -c "$CTX" -np 1 --cache-ram 0 --reasoning off --host 127.0.0.1 --port "$PORT" \
   > results/service_logs/rag_llm_server.log 2>&1 &
 LLM_PID=$!
-for _ in $(seq 180); do curl -s "http://127.0.0.1:$PORT/health" | grep -q ok && break; sleep 1; done
+for _ in $(seq 900); do curl -s "http://127.0.0.1:$PORT/health" | grep -q ok && break; sleep 0.2; done
 curl -s "http://127.0.0.1:$PORT/health" | grep -q ok || { echo "llama-server did not start"; exit 1; }
-echo "== $(date -Is) llama-server ready: $FILE ctx=$CTX; MemAvailable $(awk '/MemAvailable/ {printf "%.2f GiB", $2/1048576}' /proc/meminfo)"
+# Load time and memory for `memrag profile pipeline` (load time has 0.2 s resolution)
+export RAG_LLM_LOAD_S=$(awk -v s="$START" -v e="$(date +%s.%N)" 'BEGIN {printf "%.1f", e - s}')
+export RAG_LLM_MEM_BEFORE_MIB=$MEM_BEFORE RAG_LLM_MEM_AFTER_MIB=$(mem_mb) RAG_LLM_CTX=$CTX
+echo "== $(date -Is) llama-server ready in ${RAG_LLM_LOAD_S} s: $FILE ctx=$CTX; MemAvailable ${MEM_BEFORE} -> ${RAG_LLM_MEM_AFTER_MIB} MiB"
 
 for cmd in "$@"; do
   echo "== $(date -Is) run: $cmd"

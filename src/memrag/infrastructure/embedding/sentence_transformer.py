@@ -18,7 +18,7 @@ class SentenceTransformerProvider:
         # CPU always float32: the Nano's Cortex-A78AE has no bf16 instructions
         dtype = getattr(torch, dtype or spec.dtype) if device.startswith("cuda") else torch.float32
         self._spec = spec
-        self._batch_size = batch_size
+        self.batch_size = batch_size  # public so a profile can compare batch sizes on one loaded model
         self.model = SentenceTransformer(
             str(model_path),
             device=device,
@@ -46,7 +46,7 @@ class SentenceTransformerProvider:
         encoded = [self._spec.encode_text(t, kind).encoded_text for t in texts]
         emb = self.model.encode(
             encoded,
-            batch_size=self._batch_size,
+            batch_size=self.batch_size,
             convert_to_numpy=True,
             show_progress_bar=False,
         ).astype(np.float32)
